@@ -1,39 +1,75 @@
-import { useEffect, useState } from 'react'
-import { supabase } from './lib/supabase'
+import { useEffect, useMemo } from 'react'
+import { Definitions } from './components/Definitions'
+import { DriverCard } from './components/DriverCard'
+import { FinancialFoundation } from './components/FinancialFoundation'
+import { Header } from './components/Header'
+import { HeroCard } from './components/HeroCard'
+import { ScaleIcon, SparkleIcon, UsersIcon } from './components/icons'
+import { SupabaseStatus } from './components/SupabaseStatus'
+import { sampleData } from './data/sampleData'
+import { buildDashboardModel } from './lib/dashboardModel'
 
 function App() {
-  const [message, setMessage] = useState('Verbinden met Supabase...')
-  const [error, setError] = useState<string | null>(null)
+  // Databron: voorlopig de voorbeelddata. Een Supabase-bron levert later dezelfde
+  // CustomerEquityDataset aan; berekeningen en componenten blijven dan gelijk.
+  const model = useMemo(() => buildDashboardModel(sampleData), [])
 
   useEffect(() => {
-    async function testConnection() {
-      const { data, error } = await supabase
-        .from('connection_test')
-        .select('message')
-        .limit(1)
-        .maybeSingle()
-
-      if (error) {
-        setError(error.message)
-        return
-      }
-
-      setMessage(data?.message ?? 'Geen testbericht gevonden.')
+    if (import.meta.env.DEV) {
+      model.warnings.forEach((warning) => console.warn(`[customer equity] ${warning}`))
     }
-
-    void testConnection()
-  }, [])
+  }, [model])
 
   return (
-    <main style={{ fontFamily: 'Arial, sans-serif', padding: '40px' }}>
-      <h1>Growth Intelligence</h1>
-      <h2>Supabase verbindingstest</h2>
-      {error ? (
-        <p role="alert">Fout: {error}</p>
-      ) : (
-        <p>{message}</p>
-      )}
-    </main>
+    <div className="page">
+      <main className="container">
+        <h1 className="sr-only">Customer Equity-dashboard</h1>
+        <p className="sr-only">
+          Totale klantwaarde, financiële onderbouwing inclusief margeuitleg en Shapley-decompositie,
+          en drie strategische drivers
+          {model.isSampleData ? ', gebaseerd op fictieve voorbeelddata' : ''}.
+        </p>
+
+        <Header company={model.company} />
+        <HeroCard
+          hero={model.hero}
+          trend={model.trend}
+          currentLabel={model.currentLabel}
+          previousLabel={model.previousLabel}
+        />
+        <FinancialFoundation model={model} />
+
+        <div className="drivers">
+          <DriverCard
+            icon={<ScaleIcon />}
+            title="Value equity"
+            subtitle="Ervaren klantwaarde"
+            driver={model.drivers.value}
+          />
+          <DriverCard
+            icon={<SparkleIcon />}
+            title="Brand equity"
+            subtitle="Merkvoorkeur"
+            driver={model.drivers.brand}
+          />
+          <DriverCard
+            icon={<UsersIcon />}
+            title="Relationship equity"
+            subtitle="Klantrelatie"
+            driver={model.drivers.relationship}
+          />
+        </div>
+
+        <Definitions
+          discountRate={model.discountRate}
+          refreshedAt={model.refreshedAt}
+          isSampleData={model.isSampleData}
+        />
+      </main>
+      <footer className="container">
+        <SupabaseStatus />
+      </footer>
+    </div>
   )
 }
 

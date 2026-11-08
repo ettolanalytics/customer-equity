@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Ruwe brondata (KKBox), te groot voor git
+data/raw/
