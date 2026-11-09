@@ -129,6 +129,17 @@ export const selectable = quarters
 /** Standaard: het laatste kwartaal. */
 export const defaultIndex = selectable[selectable.length - 1]
 
+/**
+ * Eén lijn per jaar in de grafieken: Q1–Q4, null waar (nog) geen kwartaal is.
+ * role 0 = jaar van het gekozen kwartaal, 1 = jaar ervoor, 2 = twee jaar ervoor.
+ */
+export type YearLine = { year: number; role: 0 | 1 | 2; quarters: (Quarter | null)[] }
+
+/** Kleur per rol, vaste volgorde (dit jaar, vorig jaar, twee jaar terug); gevalideerd palet. */
+export const YEAR_COLORS = ['#2a78d6', '#eb6834', '#1baf7a'] as const
+
+export const QUARTER_AXIS = ['Q1', 'Q2', 'Q3', 'Q4']
+
 /** Alles wat het scherm nodig heeft voor het gekozen kwartaal. */
 export type View = {
   /** Kwartalen tot en met het gekozen kwartaal; het laatste is het huidige. */
@@ -140,13 +151,29 @@ export type View = {
   /** "vs Q2" en "vs Q3 2025", zoals in het ontwerp. */
   vsQuarterLabel: string
   vsYearLabel: string
+  /** De laatste drie jaar t/m het gekozen kwartaal, oudste eerst (alleen jaren met data). */
+  years: YearLine[]
+  /** Positie van het gekozen kwartaal op de as Q1–Q4 (0–3). */
+  currentPos: number
 }
 
 export function viewFor(index: number): View {
   const previous = quarters[index - 1]
   const yearAgo = quarters[index - 4]
+  const series = quarters.slice(0, index + 1)
+  const [qPart, yPart] = quarters[index].label.split(' ')
+  const year = Number(yPart)
+  const years = [2, 1, 0]
+    .map((role) => ({
+      year: year - role,
+      role: role as 0 | 1 | 2,
+      quarters: QUARTER_AXIS.map((qq) => series.find((q) => q.label === `${qq} ${year - role}`) ?? null),
+    }))
+    .filter((l) => l.quarters.some((q) => q !== null))
   return {
-    series: quarters.slice(0, index + 1),
+    series,
+    years,
+    currentPos: Number(qPart.slice(1)) - 1,
     currentIndex: index,
     current: quarters[index],
     previous,
@@ -156,5 +183,5 @@ export function viewFor(index: number): View {
   }
 }
 
-/** Hover-index in een grafiek; gedeeld door alle grafieken, zoals in het ontwerp. */
+/** Hover-positie op de as Q1–Q4 (0–3); gedeeld door alle grafieken, zoals in het ontwerp. */
 export type HoverProps = { hover: number | null; setHover: (i: number | null) => void }

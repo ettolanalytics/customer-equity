@@ -137,14 +137,37 @@ drie verbanden exact kloppen (afwijking > €1 of > 0 klanten: niet publiceren e
 Elke tegel: waarde, vergelijking met vorig kwartaal en een jaar eerder,
 minigrafiek, gedeelde hover over alle grafieken.
 
+Grafieken (lijngrafiek customer equity en de minigrafieken):
+- De laatste drie jaar t/m het gekozen kwartaal, op de as Q1–Q4, één lijn per jaar.
+  Jaren zonder data vallen weg (bij Q1 2021 alleen 2020 en 2021).
+- Kleur per rol, vaste volgorde: gekozen jaar blauw #2a78d6, vorig jaar oranje
+  #eb6834, twee jaar terug groen #1baf7a (gevalideerd op kleurenblindheid).
+- Legenda: bij de lijngrafiek, plus jaartallen aan het eind van de lijnen; voor
+  de tegels één gedeelde legenda naast "What drives the value". De Churn-tegel
+  houdt de gestippelde lijn voor verwachte churn van het gekozen jaar.
+- Hover is gedeeld per kwartaalpositie en toont alle jaren, nieuwste eerst, kort:
+  "Q2 · '26 20,746 · '25 21,073 · '24 21,490". Churn zonder hover:
+  "Q3 2026 · 1,646 · Exp. 1,602".
+- Verticale assen: maximaal 3 cijfers per label ("20k", "€250", "€31.9",
+  "92.2%", "€5.3M"); in de minigrafieken hooguit 3 ticks.
+
 ## Schermteksten
 Afwijkingen van en aanvullingen op de teksten in het ontwerp:
-1. Antwoordzin: acquisition en CLV over de laatste vier kwartalen. Het
-   churndeel over de kwartalen met verwachte churn, en het aantal kwartalen staat
-   in de zin. Na de eerste zin over customer equity volgen twee zinnen:
-   "Over the last four quarters: X acquired customers (Y new, Z reacquired), and
-   average CLV fell/rose by €W. Over the last three quarters, Z fewer/more
+1. Antwoordzin: vertelt wat er gebeurde én waarom, langs customer equity =
+   actieve klanten × gemiddelde CLV, over de laatste vier kwartalen:
+   "Customer equity fell €56k (−1.1%) vs Q3 2025, because the smaller customer
+   base outweighed the higher average CLV. Over the last four quarters, the
+   customer base shrank by 357 to 20,626: 6,158 customers were acquired (5,342
+   new, 816 reacquired) and 6,515 churned. Average CLV rose by €1.65 to €254.02,
+   mainly because retention improved. Over the last four quarters, 8 fewer
    customers churned than expected."
+   - Het "because"-deel volgt uit de richting van klanten, CLV en customer
+     equity: beide omhoog/omlaag, of welke van de twee de doorslag gaf.
+   - De reden voor de CLV is het grootste van marge-effect en retentie-effect
+     uit de jaarwaterfall.
+   - Het churndeel gaat over de kwartalen met verwachte churn; het aantal
+     kwartalen staat in de zin.
+   - Alle getallen komen uit de data; de app kiest alleen woorden.
 2. Rekenvoorbeeld "How we calculate": rekent met `retention` uit de JSON. Tekst:
    "Assuming x% churn per quarter (average of the previous four quarters)".
 3. Gestippelde lijn verwachte churn: alleen waar een waarde is. In de hovertekst
@@ -171,12 +194,14 @@ Afwijkingen van en aanvullingen op de teksten in het ontwerp:
    zichtbaar in de PDF), initialen "LJ". Met de kwartaalknop kies je Q1 2021 –
    Q3 2026: alleen kwartalen waarvoor het hele scherm gevuld is (vergelijking met
    vorig jaar, antwoordzin en waterfall). Standaard het laatste kwartaal.
-   Grafieken lopen vanaf Q1 2020 tot en met het gekozen kwartaal, dat dan
+   Grafieken tonen de drie jaar t/m het gekozen kwartaal, dat dan
    het "huidige" kwartaal is. De Export-knop opent het
    afdrukvenster van de browser, waarin de gebruiker "Opslaan als PDF" kiest.
    Afdrukopmaak: A4 liggend, zonder zijbalk en knoppen.
 7. Alle CLV-bedragen met twee decimalen (bijv. €254.02), ook in de antwoordzin en
-   onder de lijngrafiek. Customer equity blijft in miljoenen.
+   onder de lijngrafiek. Customer equity in miljoenen met één decimaal ("€5.2m");
+   veranderingen onder een miljoen in duizenden ("€56k"), vanaf een miljoen in
+   miljoenen ("+€1.3m"), ook in de waterfall. Verschil in procentpunten: "pp".
 
 ## Architectuur
 ```

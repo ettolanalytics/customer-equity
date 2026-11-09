@@ -1,9 +1,9 @@
 // Hero-kaart (customer equity met vergelijkingen) en lijngrafiek
-// "Customer Equity over time", volgens het ontwerp.
-import { lineChart } from '../../lib/chart'
-import { gb, quarterShort } from '../../lib/format'
+// "Customer Equity over time": de laatste drie jaar, één lijn per jaar.
+import { gb } from '../../lib/format'
 import { type Change, type HoverProps, type View } from '../../lib/quarters'
 import { ChangeLine } from './ChangeLine'
+import { YearChart, YearLegend, yearRead } from './YearChart'
 
 function EquityChange({ change, label }: { change: Change | null; label: string }) {
   if (!change) return null
@@ -12,16 +12,8 @@ function EquityChange({ change, label }: { change: Change | null; label: string 
 }
 
 export function EquityHero({ view, hover, setHover }: { view: View } & HoverProps) {
-  const { series: quarters, current, currentIndex, vsQuarterLabel, vsYearLabel } = view
-  const chart = lineChart(
-    { W: 700, H: 230, L: 64, R: 12, T: 10, B: 26 },
-    quarters.map((q) => quarterShort(q.label)),
-    [quarters.map((q) => q.customerEquity)],
-    gb.axisMillions,
-  )
-  const idx = hover ?? currentIndex
-  const dot = { x: chart.xs(idx), y: chart.ys(quarters[idx].customerEquity) }
-  const first = quarters[0]
+  const { current, vsQuarterLabel, vsYearLabel, years } = view
+  const first = years[0]
 
   return (
     <section aria-label="Customer equity" className="hero">
@@ -47,50 +39,22 @@ export function EquityHero({ view, hover, setHover }: { view: View } & HoverProp
       <div className="card" style={{ flex: '2 1 480px', minWidth: 0, padding: '22px 24px' }}>
         <div className="chart-head">
           <span className="lbl">Customer Equity over time</span>
-          <span className="chart-read">
-            {hover !== null ? `${quarters[hover].label} · ${gb.millions(quarters[hover].customerEquity)}` : ''}
-          </span>
+          <span className="chart-read">{yearRead(view, hover, (q) => q.customerEquity, gb.millions)}</span>
         </div>
-        <div style={{ marginTop: 10 }}>
-          <div style={{ position: 'relative' }}>
-            <svg
-              viewBox="0 0 700 230"
-              width="100%"
-              role="img"
-              aria-label={`Line chart of customer equity per quarter from ${gb.millions(first.customerEquity)} in ${first.label} to ${gb.millions(current.customerEquity)} in ${current.label}`}
-              onMouseLeave={() => setHover(null)}
-              style={{ display: 'block', overflow: 'visible' }}
-            >
-              {chart.ticks.map((t) => (
-                <line key={t.label} x1="64" x2="688" y1={t.y} y2={t.y} stroke="#eeede8" strokeWidth="1" />
-              ))}
-              <path d={chart.paths[0]} fill="none" stroke="#2a78d6" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
-              {hover !== null && <line x1={dot.x} x2={dot.x} y1="10" y2="204" stroke="#c9c8c1" strokeWidth="1" />}
-              <circle cx={dot.x} cy={dot.y} r="5" fill="#2a78d6" stroke="#ffffff" strokeWidth="2" />
-              {quarters.map((q, i) => (
-                <rect
-                  key={q.label}
-                  x={chart.xs(i) - chart.step / 2}
-                  y="10"
-                  width={chart.step}
-                  height="194"
-                  fill="transparent"
-                  style={{ cursor: 'crosshair' }}
-                  onMouseEnter={() => setHover(i)}
-                />
-              ))}
-            </svg>
-            {chart.ticks.map((t) => (
-              <span key={t.label} className="ax" style={{ left: t.left, top: t.top, transform: 'translate(-100%, -50%)' }}>
-                {t.label}
-              </span>
-            ))}
-            {chart.xLabels.map((x) => (
-              <span key={x.label} className="ax" style={{ left: x.left, top: x.top, transform: 'translateX(-50%)' }}>
-                {x.label}
-              </span>
-            ))}
-          </div>
+        <YearLegend view={view} />
+        <div style={{ marginTop: 6 }}>
+          <YearChart
+            box={{ W: 700, H: 230, L: 64, R: 48, T: 10, B: 26 }}
+            view={view}
+            value={(q) => q.customerEquity}
+            axis={gb.axisMillions}
+            count={4}
+            strokeWidth={2.5}
+            directLabels
+            aria={`Line chart of customer equity per quarter, one line per year from ${first.year} to ${current.label}`}
+            hover={hover}
+            setHover={setHover}
+          />
         </div>
         <p className="decomp">
           {gb.num(current.activeEnd)} active customers × {gb.clv(current.avgClv)} average CLV

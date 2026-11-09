@@ -1,16 +1,21 @@
 // Opbouw van SVG-grafieken zoals in het ontwerp (assen, paden, hover-zones).
 // Alleen plaatsing op het scherm; de waarden zelf komen uit de JSON.
 
+/** Ronde asticks; nooit meer dan count + 1 ticks (kleine grafieken blijven leesbaar). */
 export function niceTicks(min: number, max: number, count: number) {
   const raw = (max - min) / count
   const p = Math.pow(10, Math.floor(Math.log10(raw)))
-  const n = raw / p
-  const step = (n <= 1 ? 1 : n <= 2 ? 2 : n <= 2.5 ? 2.5 : n <= 5 ? 5 : 10) * p
-  const a = Math.floor(min / step) * step
-  const b = Math.ceil(max / step) * step
-  const ticks: number[] = []
-  for (let v = a; v <= b + step / 2; v += step) ticks.push(v)
-  return { ticks, step }
+  const NICE = [1, 2, 2.5, 5, 10, 20, 25, 50, 100]
+  let k = NICE.findIndex((n) => n >= raw / p)
+  for (;;) {
+    const step = NICE[k] * p
+    const a = Math.floor(min / step) * step
+    const b = Math.ceil(max / step) * step
+    const ticks: number[] = []
+    for (let v = a; v <= b + step / 2; v += step) ticks.push(v)
+    if (ticks.length <= count + 1 || k === NICE.length - 1) return { ticks, step }
+    k += 1
+  }
 }
 
 /** Positie als percentage van de grafiek, voor HTML-labels over de SVG. */

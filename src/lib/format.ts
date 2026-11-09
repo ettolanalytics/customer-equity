@@ -9,6 +9,13 @@ const gbNum = (value: number, decimals = 0): string =>
 
 const gbSign = (value: number): string => (value >= 0 ? '+' : '−')
 
+/** Decimalen voor een asstap, maar nooit meer dan 3 cijfers in totaal. */
+function axisDecimals(value: number, step: number): number {
+  const needed = step >= 1 ? 0 : step >= 0.1 ? 1 : 2
+  const intDigits = Math.max(1, Math.floor(Math.log10(Math.max(1, Math.abs(value)))) + 1)
+  return Math.min(needed, Math.max(0, 3 - intDigits))
+}
+
 export const gb = {
   /** 1108028 → "1,108,028" */
   num: gbNum,
@@ -23,33 +30,32 @@ export const gb = {
   signedClv: (value: number) => gbSign(value) + '€' + gbNum(Math.abs(value), 2),
   /** Aantal met teken: -37956 → "−37,956" */
   signedCount: (value: number) => gbSign(value) + gbNum(Math.abs(value)),
-  /** Euro in duizenden met teken: 395767 → "+€396k" */
-  signedThousands: (value: number) => gbSign(value) + '€' + gbNum(Math.abs(value) / 1e3) + 'k',
-  /** Verschil in fractie als procentpunten zonder teken: 0.005 → "0.5 percentage points" */
-  points: (fraction: number) => gbNum(Math.abs(fraction) * 100, 1) + ' percentage points',
-  /** Asopmaak percentage: "8%" */
-  axisPct: (step: number) => (value: number) => gbNum(value * 100, step >= 0.01 ? 0 : 1) + '%',
-  /** Asopmaak aantallen: "150,000" */
-  axisCount: () => (value: number) => gbNum(value),
-  /** Asopmaak CLV, twee decimalen: "€20.00" */
-  axisClv: () => (value: number) => '€' + gbNum(value, 2),
-  /** 24048003 → "€24.05m" */
-  millions: (value: number) => '€' + gbNum(value / 1e6, 2) + 'm',
+  /** Euro met teken, in duizenden of vanaf een miljoen in miljoenen: "+€396k", "+€1.3m" */
+  signedThousands: (value: number) =>
+    gbSign(value) +
+    (Math.abs(value) >= 1e6 ? '€' + gbNum(Math.abs(value) / 1e6, 1) + 'm' : '€' + gbNum(Math.abs(value) / 1e3) + 'k'),
+  /** Verschil in fractie als procentpunten zonder teken: 0.005 → "0.5 pp" */
+  points: (fraction: number) => gbNum(Math.abs(fraction) * 100, 1) + ' pp',
+  /** Asopmaak percentage, max. 3 cijfers: "8%", "91.5%" */
+  axisPct: (step: number) => (value: number) => gbNum(value * 100, axisDecimals(value * 100, step * 100)) + '%',
+  /** Asopmaak aantallen, max. 3 cijfers: 20500 → "20.5k", 850 → "850" */
+  axisCount: (step: number) => (value: number) =>
+    Math.abs(value) >= 1000
+      ? gbNum(value / 1e3, axisDecimals(value / 1e3, step / 1e3)) + 'k'
+      : gbNum(value, axisDecimals(value, step)),
+  /** Asopmaak euro per klant, max. 3 cijfers: "€250", "€31.5" */
+  axisClv: (step: number) => (value: number) => '€' + gbNum(value, axisDecimals(value, step)),
+  /** Customer equity, één decimaal: 5239362 → "€5.2m" */
+  millions: (value: number) => '€' + gbNum(value / 1e6, 1) + 'm',
+  /** Bedrag in de antwoordzin: onder een miljoen in duizenden, anders miljoenen: "€56k", "€1.2m" */
+  eurShort: (value: number) =>
+    Math.abs(value) >= 1e6 ? '€' + gbNum(Math.abs(value) / 1e6, 1) + 'm' : '€' + gbNum(Math.abs(value) / 1e3) + 'k',
   /** Fractie zonder teken: 0.08034 → "8.0%" */
   pct: (fraction: number) => gbNum(Math.abs(fraction) * 100, 1) + '%',
   /** Fractie met teken: -0.0054 → "−0.5%" */
   signedPct: (fraction: number) => gbSign(fraction) + gbNum(Math.abs(fraction) * 100, 1) + '%',
-  /**
-   * Asopmaak in miljoenen: "€24M". Zoveel decimalen als de stapgrootte nodig
-   * heeft, zodat een stap van 2,5 miljoen "€22.5M" toont en niet "€23M".
-   */
-  axisMillions: (step: number) => (value: number) =>
-    '€' +
-    gbNum(
-      value / 1e6,
-      Number.isInteger(Math.round(step) / 1e6) ? 0 : Number.isInteger(Math.round(step) / 1e5) ? 1 : 2,
-    ) +
-    'M',
+  /** Asopmaak in miljoenen, max. 3 cijfers: "€5M", "€5.25M" */
+  axisMillions: (step: number) => (value: number) => '€' + gbNum(value / 1e6, axisDecimals(value / 1e6, step / 1e6)) + 'M',
 }
 
 /** "Q3 2026" → "Q3 '26" */
