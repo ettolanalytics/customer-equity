@@ -57,6 +57,11 @@ Verkennen → ontwerpen → bouwen → verankeren.
   het eind van het kwartaal actief.
 - Klanten die binnen één kwartaal binnenkomen en weer weggaan, tellen niet als
   nieuw en niet als churn.
+- Reacquired klant: eerder gechurnd (langer dan 30 dagen weg), niet actief aan
+  het begin van het kwartaal en wel aan het eind.
+- Acquisition = nieuw + reacquired (= eind − begin + churn). Op het scherm staan
+  nieuw en reacquired altijd apart zichtbaar; in de JSON als losse velden
+  (newCustomers, reacquiredCustomers) naast het totaal (acquiredCustomers).
 - Omzet: actual_amount_paid, alleen uit regels met is_cancel = 0.
 - Marge per klant per kwartaal: omzet in euro × 30%.
 - CLV: marge per kwartaal × verwachte duur als klant (max. 20 kwartalen),
@@ -67,18 +72,95 @@ Verkennen → ontwerpen → bouwen → verankeren.
 - Acquisitiekosten tellen niet mee.
 
 ## Verklaring van de verandering (waterfall)
-Per kwartaal, tegen de gemiddelde CLV aan het begin van het kwartaal:
-- + nieuwe klanten × CLV. Nieuwe klanten in de waterfall en de Acquisition-tegel
-  = nieuw + terug, volgens het design (eind − begin + churn). In de JSON blijven
-  nieuw en terug als losse velden staan.
-- − verwachte churn × CLV
-- ± (verwachte − werkelijke churn) × CLV
-- ± verandering gemiddelde CLV × klanten aan eind kwartaal
+Twee waterfalls, met een toggle Year / Quarter op het scherm. Jaar is de
+standaard. Beide tegen de gemiddelde CLV aan het begin van de periode (V0), met
+N0 en N1 = actieve klanten aan begin en eind, V1 = CLV aan het eind.
+
+Jaar (bijv. Q4 2015 → Q4 2016):
+- + nieuwe klanten (som van de vier kwartalen) × V0
+- + reacquired klanten (som) × V0
+- − werkelijke churn (som) × V0
+- ± marge-effect en ± retentie-effect (zie onder)
+
+Kwartaal (bijv. Q3 2016 → Q4 2016):
+- + nieuwe klanten × V0
+- + reacquired klanten × V0
+- − verwachte churn × V0
+- ± (verwachte − werkelijke churn) × V0
+- ± marge-effect en ± retentie-effect (zie onder)
+
+CLV-verandering, gesplitst (beide waterfalls):
+- Vm = CLV met de marge van het eind en de retentie van het begin.
+- Marge-effect = (Vm − V0) × N1.
+- Retentie-effect = (V1 − Vm) × N1.
+
+Op het scherm: positieve bedragen onder Added, negatieve onder Lost.
 Kwartalen zonder verwachte churn (geen vorig jaar: Q2 2015 – Q1 2016) krijgen
-geen waterfall: het veld waterfall is null.
+geen waterfall: de velden zijn null.
 De onderdelen moeten exact optellen tot de verandering in customer equity.
 Dit wordt in code gecontroleerd. Sluit het niet (bijv. door terugkerende klanten),
 dan melden en niet stilletjes wegpoetsen.
+
+## Opbouw van het scherm
+Van boven naar beneden:
+1. Customer equity: hero-kaart + lijngrafiek.
+2. Twee tegels, de factoren: Active customers en Average CLV.
+3. De drivers, elk groepje visueel onder zijn factor: onder Active customers de
+   tegels New, Reacquired en Churn; onder Average CLV de tegels Margin per
+   customer en Retention (4-quarter average).
+4. Waterfall.
+5. How we calculate.
+
+De tegels tonen exact de drivers van customer equity:
+- customer equity = active customers × average CLV;
+- active customers = vorig kwartaal + new + reacquired − churn;
+- average CLV volgt uit margin per customer en retention (10% disconto per jaar,
+  20 kwartalen, beide vast).
+Churn (tegel) = het aantal werkelijk gechurnde klanten in het kwartaal; hoort bij
+active customers. Retention = 1 − gemiddeld churnpercentage van de vorige
+4 kwartalen; hoort bij de CLV. Het rekenscript controleert per kwartaal dat deze
+drie verbanden exact kloppen (afwijking > €1 of > 0 klanten: stoppen en melden).
+Elke tegel: waarde, vergelijking met vorig kwartaal en een jaar eerder,
+minigrafiek, gedeelde hover over alle grafieken.
+
+## Schermteksten
+Afwijkingen van en aanvullingen op de teksten in het ontwerp:
+1. Antwoordzin: acquisition en CLV over de laatste vier kwartalen. Het
+   churndeel over de kwartalen met verwachte churn, en het aantal kwartalen staat
+   in de zin. Na de eerste zin over customer equity volgen twee zinnen:
+   "Over the last four quarters: X acquired customers (Y new, Z reacquired), and
+   average CLV fell/rose by €W. Over the last three quarters, Z fewer/more
+   customers churned than expected."
+2. Rekenvoorbeeld "How we calculate": rekent met `retention` uit de JSON. Tekst:
+   "Assuming x% churn per quarter (average of the previous four quarters)".
+3. Gestippelde lijn verwachte churn: alleen waar een waarde is. In de hovertekst
+   "Expected —" bij kwartalen zonder waarde.
+4. Tegels New en Reacquired staan los (er is geen aparte Acquisition-tegel meer;
+   acquisition = new + reacquired staat in de antwoordzin). Tooltip Reacquired:
+   "Customers who churned earlier (more than 30 days without a subscription) and
+   came back." Tooltip Retention: "Average churn of the previous four quarters,
+   used to calculate CLV. Differs from this quarter's churn." De Churn-tegel
+   houdt de gestippelde lijn voor verwachte churn ("Expected —" in de hover
+   waar geen waarde is).
+   Waterfall-labels: "New customers", "Reacquired customers", "Churn" (jaar) of
+   "Expected churn" en "Lower/Higher churn than expected" (kwartaal), "Lower/Higher
+   margin per customer", "Lower/Higher retention". Toelichting bij marge bijv.
+   "Margin per customer €3.67 → €3.18 per quarter × 1,108,028 customers."
+   Toggle Year / Quarter rechtsboven op de waterfall-kaart; periodelabel en titel
+   veranderen mee.
+   How we calculate, stap 3: noemt new en reacquired en de splitsing in marge-
+   en retentie-effect.
+5. Actieve klant: "An active customer is a customer with a running subscription,
+   or within 30 days after it expired."
+6. Header: bedrijfsnaam "KKBox (public dataset)", initialen "LJ". Met de
+   kwartaalknop kies je Q2, Q3 of Q4 2016: alleen kwartalen waarvoor het hele
+   scherm gevuld is (vergelijking met vorig jaar, antwoordzin en waterfall).
+   Standaard Q4 2016. Grafieken lopen tot en met het gekozen kwartaal, dat dan
+   het "huidige" kwartaal is. De Export-knop opent het
+   afdrukvenster van de browser, waarin de gebruiker "Opslaan als PDF" kiest.
+   Afdrukopmaak: A4 liggend, zonder zijbalk en knoppen.
+7. Alle CLV-bedragen met twee decimalen (bijv. €21.70), ook in de antwoordzin en
+   onder de lijngrafiek. Customer equity blijft in miljoenen.
 
 ## Code
 - Een los rekenscript maakt de kwartaalcijfers en schrijft ze naar een JSON-bestand.

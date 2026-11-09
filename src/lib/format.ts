@@ -1,87 +1,59 @@
-// Nederlandse getal-, valuta- en datumopmaak.
+// Getal- en valutaopmaak volgens het ontwerp: en-GB, €, "m" voor miljoenen.
+// CLV-bedragen altijd met twee decimalen (CLAUDE.md, Schermteksten 7).
 
-const MONTHS_SHORT = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec']
-const MONTHS_LONG = [
-  'januari',
-  'februari',
-  'maart',
-  'april',
-  'mei',
-  'juni',
-  'juli',
-  'augustus',
-  'september',
-  'oktober',
-  'november',
-  'december',
-]
-
-export function num(value: number, decimals = 0): string {
-  return new Intl.NumberFormat('nl-NL', {
+const gbNum = (value: number, decimals = 0): string =>
+  new Intl.NumberFormat('en-GB', {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
   }).format(value)
+
+const gbSign = (value: number): string => (value >= 0 ? '+' : '−')
+
+export const gb = {
+  /** 1108028 → "1,108,028" */
+  num: gbNum,
+  sign: gbSign,
+  /** 21.7 → "€22" */
+  eur: (value: number) => '€' + gbNum(Math.round(value)),
+  /** 1788334 → "+€1,788,334" */
+  signedEur: (value: number) => gbSign(value) + '€' + gbNum(Math.abs(Math.round(value))),
+  /** CLV-bedrag, altijd twee decimalen: 21.7034 → "€21.70" */
+  clv: (value: number) => '€' + gbNum(value, 2),
+  /** CLV-verschil met teken: 0.7008 → "+€0.70" */
+  signedClv: (value: number) => gbSign(value) + '€' + gbNum(Math.abs(value), 2),
+  /** Aantal met teken: -37956 → "−37,956" */
+  signedCount: (value: number) => gbSign(value) + gbNum(Math.abs(value)),
+  /** Euro in duizenden met teken: 395767 → "+€396k" */
+  signedThousands: (value: number) => gbSign(value) + '€' + gbNum(Math.abs(value) / 1e3) + 'k',
+  /** Verschil in fractie als procentpunten zonder teken: 0.005 → "0.5 percentage points" */
+  points: (fraction: number) => gbNum(Math.abs(fraction) * 100, 1) + ' percentage points',
+  /** Asopmaak percentage: "8%" */
+  axisPct: (step: number) => (value: number) => gbNum(value * 100, step >= 0.01 ? 0 : 1) + '%',
+  /** Asopmaak aantallen: "150,000" */
+  axisCount: () => (value: number) => gbNum(value),
+  /** Asopmaak CLV, twee decimalen: "€20.00" */
+  axisClv: () => (value: number) => '€' + gbNum(value, 2),
+  /** 24048003 → "€24.05m" */
+  millions: (value: number) => '€' + gbNum(value / 1e6, 2) + 'm',
+  /** Fractie zonder teken: 0.08034 → "8.0%" */
+  pct: (fraction: number) => gbNum(Math.abs(fraction) * 100, 1) + '%',
+  /** Fractie met teken: -0.0054 → "−0.5%" */
+  signedPct: (fraction: number) => gbSign(fraction) + gbNum(Math.abs(fraction) * 100, 1) + '%',
+  /**
+   * Asopmaak in miljoenen: "€24M". Zoveel decimalen als de stapgrootte nodig
+   * heeft, zodat een stap van 2,5 miljoen "€22.5M" toont en niet "€23M".
+   */
+  axisMillions: (step: number) => (value: number) =>
+    '€' +
+    gbNum(
+      value / 1e6,
+      Number.isInteger(Math.round(step) / 1e6) ? 0 : Number.isInteger(Math.round(step) / 1e5) ? 1 : 2,
+    ) +
+    'M',
 }
 
-export function eur(value: number, decimals = 0): string {
-  return new Intl.NumberFormat('nl-NL', {
-    style: 'currency',
-    currency: 'EUR',
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  }).format(value)
-}
-
-/** Fractie als percentage: 0,148 → "14,8%". */
-export function pct(fraction: number, decimals = 1): string {
-  return `${num(fraction * 100, decimals)}%`
-}
-
-export function millions(value: number): string {
-  return `€ ${num(value / 1e6, 2)} mln`
-}
-
-/** Plus- of minteken (typografisch minteken). */
-export function sign(value: number): string {
-  return value >= 0 ? '+' : '−'
-}
-
-/** Relatieve verandering: "+6,1%". */
-export function relativeChange(current: number, previous: number): string {
-  const diff = current - previous
-  return `${sign(diff)}${num(Math.abs(diff / previous) * 100, 1)}%`
-}
-
-/** Verandering in procentpunten tussen twee fracties: "+2,0 pp". */
-export function pointChange(current: number, previous: number): string {
-  const diff = current - previous
-  return `${sign(diff)}${num(Math.abs(diff) * 100, 1)} pp`
-}
-
-function parseMonth(month: string): { year: string; index: number } {
-  const [year, m] = month.split('-')
-  return { year, index: Number(m) - 1 }
-}
-
-/** "2026-03" → "mrt" */
-export function monthShort(month: string): string {
-  return MONTHS_SHORT[parseMonth(month).index]
-}
-
-/** "2026-03" → "mrt 2026" */
-export function monthLabel(month: string): string {
-  const { year, index } = parseMonth(month)
-  return `${MONTHS_SHORT[index]} ${year}`
-}
-
-/** "2026-03" → "maart 2026" */
-export function monthLong(month: string): string {
-  const { year, index } = parseMonth(month)
-  return `${MONTHS_LONG[index]} ${year}`
-}
-
-/** "2026-11-02" → "2 nov 2026" */
-export function dateLabel(date: string): string {
-  const [year, m, d] = date.split('-')
-  return `${Number(d)} ${MONTHS_SHORT[Number(m) - 1]} ${year}`
+/** "Q4 2016" → "Q4 '16" */
+export function quarterShort(label: string): string {
+  const [q, year] = label.split(' ')
+  return `${q} '${year.slice(2)}`
 }

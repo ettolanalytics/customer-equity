@@ -1,0 +1,147 @@
+// Kwartaalcijfers uit het rekenscript (scripts/build_quarters.py).
+// De app rekent niets zelf: alle getallen komen uit dit bestand.
+import raw from '../data/quarters.json'
+
+export type Change = { abs: number; pct: number }
+
+export type YearSummary = {
+  acquiredCustomers: number
+  newCustomers: number
+  reacquiredCustomers: number
+  avgClvChange: number
+  churnQuarters: number
+  churnVsExpected: number | null
+}
+
+/** Waterfall (jaar of kwartaal); alle bedragen en aantallen uit het rekenscript. */
+export type Waterfall = {
+  fromLabel: string
+  toLabel: string
+  equityBegin: number
+  equityEnd: number
+  equityChange: number
+  equityChangePct: number
+  /** Euro-posten; samen precies equityChange. Jaar: churn. Kwartaal: expectedChurn + churnVsExpected. */
+  parts: {
+    newCustomers: number
+    reacquiredCustomers: number
+    churn?: number
+    expectedChurn?: number
+    churnVsExpected?: number
+    marginEffect: number
+    retentionEffect: number
+  }
+  counts: {
+    newCustomers: number
+    reacquiredCustomers: number
+    churn: number
+    expectedChurn?: number
+    churnVsExpected?: number
+  }
+  customersBegin: number
+  customersEnd: number
+  avgClvBegin: number
+  avgClvEnd: number
+  marginBegin: number
+  marginEnd: number
+  retentionBegin: number
+  retentionEnd: number
+}
+
+export type ClvExample = {
+  churnRate: number
+  expectedQuarters: number
+  undiscountedValue: number
+}
+
+export type Quarter = {
+  label: string
+  activeBegin: number
+  activeEnd: number
+  newCustomers: number
+  reacquiredCustomers: number
+  acquiredCustomers: number
+  churn: number
+  expectedChurn: number | null
+  churnRate: number
+  expectedChurnRate: number | null
+  churnRateVsExpected: number | null
+  revenueEur: number
+  marginPerCustomer: number
+  retention: number
+  retentionQuarters: number
+  clvBasis: string
+  avgClv: number
+  customerEquity: number
+  equityVsPrevQuarter: Change | null
+  equityVsYearAgo: Change | null
+  acquiredVsPrevQuarter: Change | null
+  acquiredVsYearAgo: Change | null
+  churnRateVsPrevQuarter: number | null
+  churnRateVsYearAgo: number | null
+  avgClvVsPrevQuarter: Change | null
+  avgClvVsYearAgo: Change | null
+  activeVsPrevQuarter: Change | null
+  activeVsYearAgo: Change | null
+  newVsPrevQuarter: Change | null
+  newVsYearAgo: Change | null
+  reacquiredVsPrevQuarter: Change | null
+  reacquiredVsYearAgo: Change | null
+  churnVsPrevQuarter: Change | null
+  churnVsYearAgo: Change | null
+  marginVsPrevQuarter: Change | null
+  marginVsYearAgo: Change | null
+  /** Verschil in retentie als fractie (x 100 = procentpunten). */
+  retentionVsPrevQuarter: number | null
+  retentionVsYearAgo: number | null
+  /** Werkelijke min verwachte churn (aantal). */
+  churnVsExpectedCount: number | null
+  yearSummary: YearSummary | null
+  clvExample: ClvExample
+  waterfall: Waterfall | null
+  yearWaterfall: Waterfall | null
+}
+
+export const quarters = raw as Quarter[]
+
+/**
+ * Te kiezen kwartalen: alleen kwartalen waarvoor het hele scherm gevuld is
+ * (waterfall, vergelijking met vorig jaar, antwoordzin). Nu Q2-Q4 2016.
+ */
+export const selectable = quarters
+  .map((q, i) => ({ q, i }))
+  .filter(({ q }) => q.waterfall !== null && q.yearWaterfall !== null && q.equityVsYearAgo !== null && q.yearSummary !== null)
+  .map(({ i }) => i)
+
+/** Standaard: het laatste kwartaal (Q4 2016). */
+export const defaultIndex = selectable[selectable.length - 1]
+
+/** Alles wat het scherm nodig heeft voor het gekozen kwartaal. */
+export type View = {
+  /** Kwartalen tot en met het gekozen kwartaal; het laatste is het huidige. */
+  series: Quarter[]
+  currentIndex: number
+  current: Quarter
+  previous: Quarter
+  yearAgo: Quarter
+  /** "vs Q3" en "vs Q4 2015", zoals in het ontwerp. */
+  vsQuarterLabel: string
+  vsYearLabel: string
+}
+
+export function viewFor(index: number): View {
+  const previous = quarters[index - 1]
+  const yearAgo = quarters[index - 4]
+  return {
+    series: quarters.slice(0, index + 1),
+    currentIndex: index,
+    current: quarters[index],
+    previous,
+    yearAgo,
+    vsQuarterLabel: 'vs ' + previous.label.split(' ')[0],
+    vsYearLabel: 'vs ' + yearAgo.label,
+  }
+}
+
+/** Hover-index in een grafiek; gedeeld door alle grafieken, zoals in het ontwerp. */
+export type HoverProps = { hover: number | null; setHover: (i: number | null) => void }
