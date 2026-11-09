@@ -5,7 +5,8 @@
 //
 // Nodig: SUPABASE_URL en SUPABASE_PUBLISHABLE_KEY (Netlify: omgevingsvariabelen;
 // lokaal: .env.local, waar ook de VITE_-namen worden geaccepteerd).
-import { existsSync, renameSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, renameSync, writeFileSync } from 'node:fs'
+import { dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url))
@@ -94,6 +95,7 @@ const out = {
   },
   quarters: rows.map((r) => r.data),
 }
+mkdirSync(dirname(OUT), { recursive: true }) // src/data/ bestaat niet in een verse clone
 writeFileSync(`${OUT}.tmp`, JSON.stringify(out, null, 2) + '\n')
 renameSync(`${OUT}.tmp`, OUT)
 console.log(`✓ ${rows.length} kwartalen (${rows[0].label} – ${p.last_quarter}) uit Supabase, gemaakt ${p.generated_at}.`)
