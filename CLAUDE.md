@@ -27,34 +27,55 @@ Verkennen → ontwerpen → bouwen → verankeren.
   voor het einde van de 30 dagen respijt.)
 - Opschonen: dubbele regels tussen v1 en v2 verwijderen; vervaldatums vóór 2015
   of na 2019 eruit.
+- Betaalmethode 39: klanten die ooit methode 39 gebruikten, worden helemaal
+  weggelaten (alle transacties van die klant). Reden: storing in Q2 2016, gevolgd
+  door een massale heractivering op 31 juli 2016.
+- Klant worden: iemand wordt klant op de datum van zijn eerste betaalde
+  abonnement (is_cancel = 0, payment_plan_days ≥ 30, actual_amount_paid > 0).
+  Transacties vóór die datum tellen niet mee. Daarna tellen alle transacties mee
+  voor de vraag of iemand actief is, ook gratis maanden. Klanten zonder zo'n
+  betaald abonnement tellen nergens mee.
+- Beide besluiten gaan vóór alle andere berekeningen (ook omzet).
 
 ## Vaste aannames (in het rekenscript, niet instelbaar in de app)
-- Contributiemarge: 30% van actual_amount_paid
+- Contributiemarge: 30% van actual_amount_paid (alleen is_cancel = 0)
   (onderbouwing: Spotify Premium-brutomarge 29–34% in 2023–2025).
 - Valuta: euro. 1 EUR = 35,14 TWD (gemiddelde jaarkoers 2015–2017, ValutaFX).
 - Discontovoet: 10% per jaar.
 - CLV-horizon: maximaal 20 kwartalen (5 jaar).
 
 ## Definities
-- Actieve klant: lopend abonnement op de peildatum (kwartaaleinde).
+- Actieve klant: vervaldatum + 30 dagen ligt ná de peildatum (kwartaaleinde).
 - Churn: geen nieuw geldig abonnement binnen 30 dagen na de vervaldatum.
-  Telt in het kwartaal waarin het abonnement afliep.
-- Churnpercentage: churn in kwartaal ÷ actieve klanten aan begin kwartaal.
+  Telt in het kwartaal waarin die 30 dagen aflopen.
+- Er is geen groep "respijt": klanten binnen de 30 dagen tellen als actief.
+- Churnpercentage: klanten die aan het begin van het kwartaal actief waren en in
+  het kwartaal zijn gechurnd ÷ actieve klanten aan het begin.
 - Verwachte churn: churnpercentage van hetzelfde kwartaal vorig jaar
   × actieve klanten aan begin kwartaal.
-- Nieuwe klant: eerste transactie valt in het kwartaal.
+- Nieuwe klant: eerste transactie ooit valt in het kwartaal én de klant is aan
+  het eind van het kwartaal actief.
+- Klanten die binnen één kwartaal binnenkomen en weer weggaan, tellen niet als
+  nieuw en niet als churn.
+- Omzet: actual_amount_paid, alleen uit regels met is_cancel = 0.
 - Marge per klant per kwartaal: omzet in euro × 30%.
 - CLV: marge per kwartaal × verwachte duur als klant (max. 20 kwartalen),
-  verdisconteerd tegen 10% per jaar. Retentie per kwartaal = 1 − verwachte churn.
+  verdisconteerd tegen 10% per jaar.
+- CLV-retentie per kwartaal = 1 − gemiddeld churnpercentage van de vorige
+  4 kwartalen. Zijn er minder dan 4, het gemiddelde van de kwartalen die er zijn.
 - Customer equity: actieve klanten × gemiddelde CLV.
 - Acquisitiekosten tellen niet mee.
 
 ## Verklaring van de verandering (waterfall)
 Per kwartaal, tegen de gemiddelde CLV aan het begin van het kwartaal:
-- + nieuwe klanten × CLV
+- + nieuwe klanten × CLV. Nieuwe klanten in de waterfall en de Acquisition-tegel
+  = nieuw + terug, volgens het design (eind − begin + churn). In de JSON blijven
+  nieuw en terug als losse velden staan.
 - − verwachte churn × CLV
 - ± (verwachte − werkelijke churn) × CLV
 - ± verandering gemiddelde CLV × klanten aan eind kwartaal
+Kwartalen zonder verwachte churn (geen vorig jaar: Q2 2015 – Q1 2016) krijgen
+geen waterfall: het veld waterfall is null.
 De onderdelen moeten exact optellen tot de verandering in customer equity.
 Dit wordt in code gecontroleerd. Sluit het niet (bijv. door terugkerende klanten),
 dan melden en niet stilletjes wegpoetsen.

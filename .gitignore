@@ -25,3 +25,6 @@ dist-ssr
 
 # Ruwe brondata (KKBox), te groot voor git
 data/raw/
+
+# Python-omgeving voor scripts/
+.venv/
