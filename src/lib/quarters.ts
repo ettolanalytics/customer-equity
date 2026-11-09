@@ -1,5 +1,5 @@
-// Kwartaalcijfers uit het rekenscript (scripts/build_quarters.py).
-// De app rekent niets zelf: alle getallen komen uit dit bestand.
+// Kwartaalcijfers en aannames uit Supabase (ce_public), bij de build opgehaald door
+// scripts/fetch-quarters.mjs. De app rekent niets zelf: alle getallen komen uit dit bestand.
 import raw from '../data/quarters.json'
 
 export type Change = { abs: number; pct: number }
@@ -70,7 +70,6 @@ export type Quarter = {
   marginPerCustomer: number
   retention: number
   retentionQuarters: number
-  clvBasis: string
   avgClv: number
   customerEquity: number
   equityVsPrevQuarter: Change | null
@@ -102,18 +101,32 @@ export type Quarter = {
   yearWaterfall: Waterfall | null
 }
 
-export const quarters = raw as Quarter[]
+/** Vaste aannames als getallen, voor de teksten op het scherm. */
+export type Assumptions = {
+  discountRateYear: number
+  horizonQuarters: number
+  graceDays: number
+  priceEur: number
+  costPerInvoiceEur: number
+  marginPerInvoiceEur: number
+  generatedAt: string
+  firstSelectable: string
+  lastQuarter: string
+}
+
+export const assumptions = raw.assumptions as Assumptions
+export const quarters = raw.quarters as Quarter[]
 
 /**
  * Te kiezen kwartalen: alleen kwartalen waarvoor het hele scherm gevuld is
- * (waterfall, vergelijking met vorig jaar, antwoordzin). Nu Q2-Q4 2016.
+ * (waterfall, vergelijking met vorig jaar, antwoordzin).
  */
 export const selectable = quarters
   .map((q, i) => ({ q, i }))
   .filter(({ q }) => q.waterfall !== null && q.yearWaterfall !== null && q.equityVsYearAgo !== null && q.yearSummary !== null)
   .map(({ i }) => i)
 
-/** Standaard: het laatste kwartaal (Q4 2016). */
+/** Standaard: het laatste kwartaal. */
 export const defaultIndex = selectable[selectable.length - 1]
 
 /** Alles wat het scherm nodig heeft voor het gekozen kwartaal. */

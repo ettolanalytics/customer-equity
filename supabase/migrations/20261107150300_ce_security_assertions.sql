@@ -1,5 +1,5 @@
--- Customer Equity · migratie 4/4
--- Controleert de werkelijke rechten na migraties 1-3 en breekt de migratie af
+-- Customer Equity · migratie 5/5
+-- Controleert de werkelijke rechten na migraties 1-4 en breekt de migratie af
 -- (rollback) bij elke afwijking. Wijzigt zelf niets.
 --
 -- Gecontroleerd:
@@ -10,8 +10,11 @@
 --   4. anon heeft SELECT én een SELECT-policy op elke ce_public-tabel, en geen andere policies.
 --   5. In ce_public bestaan geen functies of procedures.
 --   6. ce_loader is geen superuser en heeft geen BYPASSRLS, CREATEROLE, CREATEDB of REPLICATION.
---   7. ce_loader heeft geen UPDATE op brondata en geen UPDATE/TRUNCATE op ce_public,
+--   7. ce_loader heeft op ce_public alleen SELECT, op invoices geen UPDATE/DELETE,
 --      en geen CREATE op de schema's.
+--   8. Functies in ce_private: niet uitvoerbaar door anon, authenticated, service_role
+--      of PUBLIC. refresh_and_publish() is SECURITY DEFINER met vaste search_path en
+--      uitvoerbaar door ce_loader.
 
 do $$
 declare
@@ -123,9 +126,9 @@ begin
   end if;
 
   -- 7. Beperkingen van ce_loader
-  if has_table_privilege('ce_loader', 'ce_private.raw_ibm_telco', 'UPDATE')
-     or has_table_privilege('ce_loader', 'ce_private.import_batches', 'UPDATE') then
-    problems := problems || 'ce_loader kan brondata bijwerken'::text;
+  if has_table_privilege('ce_loader', 'ce_private.invoices', 'UPDATE')
+     or has_table_privilege('ce_loader', 'ce_private.invoices', 'DELETE') then
+    problems := problems || 'ce_loader kan facturen wijzigen of per rij verwijderen'::text;
   end if;
   for r in
     select c.oid, c.relname
@@ -133,9 +136,40 @@ begin
     join pg_namespace n on n.oid = c.relnamespace
     where n.nspname = 'ce_public' and c.relkind in ('r', 'p')
   loop
-    if has_table_privilege('ce_loader', r.oid, 'UPDATE')
-       or has_table_privilege('ce_loader', r.oid, 'TRUNCATE') then
-      problems := problems || format('ce_loader heeft UPDATE/TRUNCATE op ce_public.%I', r.relname);
+    foreach priv in array privs loop
+      if priv <> 'SELECT' and has_table_privilege('ce_loader', r.oid, priv) then
+        problems := problems || format('ce_loader heeft %s op ce_public.%I', priv, r.relname);
+      end if;
+    end loop;
+  end loop;
+
+  -- 8. Functies in ce_private
+  for r in
+    select p.oid, p.proname, p.prosecdef, p.proconfig
+    from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'ce_private'
+  loop
+    foreach role_name in array browser_roles loop
+      if has_function_privilege(role_name, r.oid, 'EXECUTE') then
+        problems := problems || format('%s kan ce_private.%I uitvoeren', role_name, r.proname);
+      end if;
+    end loop;
+    if exists (select 1 from aclexplode(coalesce((select proacl from pg_proc where oid = r.oid),
+                                                 acldefault('f', (select proowner from pg_proc where oid = r.oid))))
+               where grantee = 0 and privilege_type = 'EXECUTE') then
+      problems := problems || format('PUBLIC kan ce_private.%I uitvoeren', r.proname);
+    end if;
+    if r.proname = 'refresh_and_publish' then
+      if not r.prosecdef then
+        problems := problems || 'refresh_and_publish is geen SECURITY DEFINER'::text;
+      end if;
+      if r.proconfig is null or not ('search_path=""' = any (r.proconfig)) then
+        problems := problems || 'refresh_and_publish heeft geen vaste search_path'::text;
+      end if;
+      if not has_function_privilege('ce_loader', r.oid, 'EXECUTE') then
+        problems := problems || 'ce_loader kan refresh_and_publish niet uitvoeren'::text;
+      end if;
     end if;
   end loop;
   if has_schema_privilege('ce_loader', 'ce_private', 'CREATE')

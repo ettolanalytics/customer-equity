@@ -4,7 +4,7 @@
 import type { ReactNode } from 'react'
 import { lineChart, type ChartBox } from '../../lib/chart'
 import { gb, quarterShort } from '../../lib/format'
-import type { Change, HoverProps, Quarter, View } from '../../lib/quarters'
+import { assumptions as a, type Change, type HoverProps, type Quarter, type View } from '../../lib/quarters'
 import { ChangeLine } from './ChangeLine'
 
 const BOX_FACTOR: ChartBox = { W: 600, H: 120, L: 56, R: 8, T: 6, B: 22 }
@@ -63,7 +63,7 @@ function tiles({ series: quarters, current: c, currentIndex, vsQuarterLabel: vq,
   const active: Tile = {
     id: 'active',
     label: 'Active customers',
-    tip: 'Active customers: customers with a running subscription, or within 30 days after it expired. Previous quarter + new + reacquired − churn.',
+    tip: `Active customers: customers with a running subscription, or within ${a.graceDays} days after it expired. Previous quarter + new + reacquired − churn.`,
     value: gb.num(c.activeEnd),
     vsQuarter: countChange(c.activeVsPrevQuarter, vq, gb.signedCount),
     vsYear: countChange(c.activeVsYearAgo, vy, gb.signedCount),
@@ -98,7 +98,7 @@ function tiles({ series: quarters, current: c, currentIndex, vsQuarterLabel: vq,
     },
     {
       label: 'Reacquired',
-      tip: 'Customers who churned earlier (more than 30 days without a subscription) and came back.',
+      tip: `Customers who churned earlier (more than ${a.graceDays} days without a subscription) and came back.`,
       value: gb.num(c.reacquiredCustomers),
       vsQuarter: countChange(c.reacquiredVsPrevQuarter, vq, gb.signedCount),
       vsYear: countChange(c.reacquiredVsYearAgo, vy, gb.signedCount),
@@ -109,7 +109,7 @@ function tiles({ series: quarters, current: c, currentIndex, vsQuarterLabel: vq,
     },
     {
       label: 'Churn',
-      tip: 'Churn: customers active at the start of the quarter who left during it (no new subscription within 30 days). Expected churn: based on last year’s churn rate.',
+      tip: `Churn: customers active at the start of the quarter who left during it (no new subscription within ${a.graceDays} days). Expected churn: based on last year’s churn rate.`,
       value: gb.num(c.churn),
       vsQuarter: countChange(c.churnVsPrevQuarter, vq, gb.signedCount, false),
       vsYear: countChange(c.churnVsYearAgo, vy, gb.signedCount, false),
@@ -125,7 +125,7 @@ function tiles({ series: quarters, current: c, currentIndex, vsQuarterLabel: vq,
   const clvDrivers: Tile[] = [
     {
       label: 'Margin per customer',
-      tip: 'Margin per customer: contribution margin (30% of revenue) per active customer per quarter.',
+      tip: `Margin per customer: contribution margin (${gb.clv(a.priceEur)} price minus ${gb.clv(a.costPerInvoiceEur)} cost = ${gb.clv(a.marginPerInvoiceEur)} per monthly invoice) per active customer per quarter.`,
       value: gb.clv(c.marginPerCustomer),
       vsQuarter: countChange(c.marginVsPrevQuarter, vq, gb.signedClv),
       vsYear: countChange(c.marginVsYearAgo, vy, gb.signedClv),

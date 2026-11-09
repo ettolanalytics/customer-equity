@@ -28,3 +28,9 @@ data/raw/
 
 # Python-omgeving voor scripts/
 .venv/
+
+# Synthetische data (Beanrise), reproduceerbaar met scripts/generate_beanrise.py
+data/synthetic/
+
+# Kwartaalcijfers: worden bij elke build uit Supabase gehaald (scripts/fetch-quarters.mjs)
+src/data/quarters.json

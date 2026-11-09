@@ -1,20 +1,23 @@
 // "How we calculate": vier stappen en het rekenvoorbeeld (CLAUDE.md, Schermteksten 2 en 5).
 import { gb } from '../../lib/format'
-import type { Quarter, View } from '../../lib/quarters'
+import { assumptions as a, type Quarter, type View } from '../../lib/quarters'
+
+/** Percentage zonder decimalen: 0.1 → "10%" */
+const pct0 = (fraction: number) => gb.num(fraction * 100) + '%'
 
 const steps = (current: Quarter) => [
   {
     title: 'Value per customer (CLV)',
-    text: 'Contribution margin per quarter (revenue minus direct costs), times how long a customer is expected to stay. Up to 5 years ahead. Future margin is discounted to today at 10% per year.',
+    text: `Contribution margin per quarter (revenue minus direct costs), times how long a customer is expected to stay. Up to ${gb.num(a.horizonQuarters / 4)} years ahead. Future margin is discounted to today at ${pct0(a.discountRateYear)} per year.`,
     example:
       `${gb.clv(current.marginPerCustomer)} contribution margin per quarter × an average of ` +
       `${gb.num(current.clvExample.expectedQuarters, 1)} quarters as a customer = ${gb.clv(current.clvExample.undiscountedValue)}. ` +
-      `Discounted to today (10% per year) = ${gb.clv(current.avgClv)}, the average CLV in ${current.label}. ` +
-      `Assuming ${gb.pct(current.clvExample.churnRate)} churn per quarter (average of the previous four quarters), up to 20 quarters.`,
+      `Discounted to today (${pct0(a.discountRateYear)} per year) = ${gb.clv(current.avgClv)}, the average CLV in ${current.label}. ` +
+      `Assuming ${gb.pct(current.clvExample.churnRate)} churn per quarter (average of the previous four quarters), up to ${gb.num(a.horizonQuarters)} quarters.`,
   },
   {
     title: 'Customer equity',
-    text: 'The expected future contribution margin of your current customers, discounted to today: number of active customers × average CLV. An active customer is a customer with a running subscription, or within 30 days after it expired.',
+    text: `The expected future contribution margin of your current customers, discounted to today: number of active customers × average CLV. An active customer is a customer with a running subscription, or within ${a.graceDays} days after it expired.`,
   },
   {
     title: 'Change per quarter',

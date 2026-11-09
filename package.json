@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "fetch-data": "node scripts/fetch-quarters.mjs",
+    "prebuild": "node scripts/fetch-quarters.mjs",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview"

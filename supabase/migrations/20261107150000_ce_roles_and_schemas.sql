@@ -7,7 +7,7 @@
 -- ---------------------------------------------------------------------------
 -- 1. Beheerrol
 -- ---------------------------------------------------------------------------
--- Beperkte rol voor het lokale import- en publicatiescript. Geen superuser,
+-- Beperkte rol voor het lokale laadscript. Geen superuser,
 -- geen BYPASSRLS, geen CREATEROLE/CREATEDB, geen DDL-rechten. Start als NOLOGIN.
 do $$
 begin
@@ -18,8 +18,9 @@ end
 $$;
 
 comment on role ce_loader is
-  'Customer Equity: beperkte beheerrol voor lokale import-, simulatie- en publicatiescripts. '
-  'Alleen DML op ce_private en publicatie naar ce_public. Wachtwoord wordt buiten migraties gezet.';
+  'Customer Equity: beperkte beheerrol voor het lokale laadscript (Beanrise-facturen). '
+  'Laadt ce_private.invoices en generator_runs en start ce_private.refresh_and_publish(). '
+  'Wachtwoord wordt buiten migraties gezet.';
 
 alter role ce_loader set statement_timeout = '10min';
 alter role ce_loader set idle_in_transaction_session_timeout = '5min';
@@ -31,10 +32,10 @@ create schema if not exists ce_private;
 create schema if not exists ce_public;
 
 comment on schema ce_private is
-  'Customer Equity: brondata (IBM), genormaliseerde en gesimuleerde klantdata, aannames en runs. '
+  'Customer Equity: ruwe facturen (Beanrise, synthetisch), generatorruns, aannames, rekenviews en refreshlog. '
   'Mag NIET worden opgenomen in de Exposed schemas van de Data API.';
 comment on schema ce_public is
-  'Customer Equity: uitsluitend vooraf geselecteerde, geaggregeerde dashboardresultaten. '
+  'Customer Equity: uitsluitend geaggregeerde kwartaalcijfers en aannames voor het dashboard. '
   'Wordt blootgesteld aan de Data API; anon heeft alleen SELECT.';
 
 -- Schema-toegang: eerst alles dichtzetten, daarna expliciet openen.

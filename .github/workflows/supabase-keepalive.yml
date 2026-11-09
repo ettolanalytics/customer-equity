@@ -1,0 +1,38 @@
+# Houdt het Supabase-project (gratis plan) actief: twee keer per week een kleine
+# leesquery op ce_public. Antwoordt Supabase niet, dan faalt de run met een melding
+# (GitHub mailt bij een mislukte geplande run).
+#
+# Let op: GitHub zet geplande workflows uit als de repository 60 dagen geen activiteit
+# heeft. Zet hem dan weer aan onder Actions → Supabase keep-alive → Enable workflow.
+name: Supabase keep-alive
+
+on:
+  schedule:
+    - cron: '17 6 * * 1,4' # maandag en donderdag 06:17 UTC
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Leesquery op ce_public.publication
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_PUBLISHABLE_KEY" ]; then
+            echo "::error::Secrets SUPABASE_URL en/of SUPABASE_PUBLISHABLE_KEY ontbreken."
+            exit 1
+          fi
+          status=$(curl -sS -o body.json -w '%{http_code}' --max-time 30 --retry 2 --retry-delay 10 \
+            "${SUPABASE_URL%/}/rest/v1/publication?select=generated_at,last_quarter" \
+            -H "apikey: $SUPABASE_PUBLISHABLE_KEY" \
+            -H "Accept-Profile: ce_public") || status=000
+          if [ "$status" != "200" ] || ! grep -q '"generated_at"' body.json; then
+            echo "::error::Supabase antwoordt niet goed (HTTP $status). Is het project gepauzeerd? $(head -c 300 body.json 2>/dev/null)"
+            exit 1
+          fi
+          echo "Supabase actief: $(cat body.json)"

@@ -1,11 +1,12 @@
-"""Rekenscript: kwartaalcijfers customer equity uit de KKBox-data.
+"""Rekenscript: kwartaalcijfers customer equity uit de Beanrise-facturen.
 
-Leest data/raw/{transactions,transactions_v2,members_v3}.parquet en schrijft
-src/data/quarters.json. Definities en aannames: zie CLAUDE.md.
+Leest data/synthetic/beanrise_invoices.parquet (scripts/generate_beanrise.py) en
+schrijft src/data/quarters.json. Definities en aannames: zie CLAUDE.md.
 
-Draaien:  .venv/bin/python scripts/build_quarters.py
+Draaien:  .venv/bin/python scripts/build_quarters.py [--input X.parquet] [--out Y.json]
 """
 
+import argparse
 import json
 import sys
 from datetime import date, timedelta
@@ -14,23 +15,22 @@ from pathlib import Path
 import duckdb
 
 ROOT = Path(__file__).resolve().parent.parent
-RAW = ROOT / "data" / "raw"
-OUT = ROOT / "src" / "data" / "quarters.json"
+DEFAULT_INPUT = ROOT / "data" / "synthetic" / "beanrise_invoices.parquet"
+DEFAULT_OUT = ROOT / "src" / "data" / "quarters.json"
 
-# Vaste aannames (CLAUDE.md)
-MARGIN = 0.30                 # contributiemarge op actual_amount_paid
-TWD_PER_EUR = 35.14           # gemiddelde jaarkoers 2015-2017
+# Vaste aannames
+COST_EUR = 14.00              # kostprijs per factuur (pak bonen + bezorging)
 DISCOUNT_YEAR = 0.10          # discontovoet per jaar
 HORIZON = 20                  # max. kwartalen (5 jaar)
 GRACE_DAYS = 30               # respijt voor churn
-SHORT_PLAN_DAYS = 30          # "abonnement van minder dan 30 dagen"
 
 DISCOUNT_Q = (1 + DISCOUNT_YEAR) ** 0.25 - 1
 
-# Q1 2015 t/m Q4 2016. Q1 2015 is nodig als "vorig jaar" voor Q1 2016 en als
-# eerste kwartaal in het CLV-gemiddelde; het staat niet in het dashboard.
-QUARTERS = [(y, q) for y in (2015, 2016) for q in (1, 2, 3, 4)]
-DASHBOARD = QUARTERS[1:]  # Q2 2015 - Q4 2016
+# Rekenkwartalen Q1 2019 t/m Q3 2026. Q1-Q4 2019 zijn alleen nodig als historie
+# (CLV-retentie en verwachte churn van 2020). In de JSON: Q1 2020 t/m Q3 2026,
+# zodat Q1 2021 een volledig kwartaal van een jaar eerder heeft.
+QUARTERS = [(y, q) for y in range(2019, 2027) for q in (1, 2, 3, 4) if (y, q) <= (2026, 3)]
+DASHBOARD = [k for k in QUARTERS if k >= (2020, 1)]
 
 
 def q_start(y, q):
@@ -55,241 +55,58 @@ def clv(margin_q, retention):
     return margin_q * sum(factor**k for k in range(1, HORIZON + 1))
 
 
-con = duckdb.connect()
-
-# --- Opschonen -------------------------------------------------------------
-# v1 en v2 samenvoegen, dubbele regels weg, vervaldatums buiten 2015-2019 weg.
-con.sql(f"""
-create table tx0 as
-select msno,
-       strptime(cast(transaction_date as varchar), '%Y%m%d')::date        as tdate,
-       strptime(cast(membership_expire_date as varchar), '%Y%m%d')::date  as edate,
-       is_cancel,
-       payment_plan_days,
-       payment_method_id,
-       actual_amount_paid
-from (
-    select distinct * from (
-        select * from '{RAW / "transactions.parquet"}'
-        union all
-        select * from '{RAW / "transactions_v2.parquet"}'
-    )
-)
-where membership_expire_date between 20150101 and 20191231
-""")
-
-# Besluit 1: klanten die ooit betaalmethode 39 gebruikten, helemaal weglaten.
-con.sql("""
-create table tx1 as
-select * from tx0
-where msno not in (select msno from tx0 where payment_method_id = 39)
-""")
-# Besluit 2: klant vanaf het eerste betaalde abonnement (is_cancel = 0,
-# >= 30 dagen, > 0 betaald). Eerdere transacties en klanten zonder zo'n
-# abonnement tellen nergens mee.
-con.sql("""
-create table tx as
-select t.* exclude (payment_method_id)
-from tx1 t
-join (select msno, min(tdate) start from tx1
-      where is_cancel = 0 and payment_plan_days >= 30 and actual_amount_paid > 0
-      group by msno) s using (msno)
-where t.tdate >= s.start
-""")
-n0, n1, n2 = (con.sql(f"select count(distinct msno) from {t}").fetchall()[0][0]
-              for t in ("tx0", "tx1", "tx"))
-tx_before_start = con.sql("""
-select count(*) from tx1 where msno in (select msno from tx)
-""").fetchall()[0][0] - con.sql("select count(*) from tx").fetchall()[0][0]
-
-# --- Tijdlijn per klant -----------------------------------------------------
-# Elke transactie zet het einde van het abonnement op haar vervaldatum (ook een
-# cancel-rij: die vervaldatum is het nieuwe einde). Bij gelijke datum telt een
-# cancel-rij als laatste. De transactie geldt tot de volgende transactie.
-con.sql("""
-create table tl as
-select *,
-       lead(tdate) over w as next_tdate,
-       -- moment waarop het abonnement afloopt als er niets meer gebeurt;
-       -- een cancel met vervaldatum in het verleden stopt direct
-       greatest(edate, tdate) as lapse
-from tx
-window w as (partition by msno order by tdate, is_cancel, edate)
-""")
-
-# --- Peildata --------------------------------------------------------------
-peil = [date(2014, 12, 31)] + [q_end(y, q) for y, q in QUARTERS]
-con.sql("create table peil (d date)")
-con.executemany("insert into peil values (?)", [[d] for d in peil])
-
-# Geldende transactie per klant op peildatum d: tdate <= d < next_tdate.
-# Actief op d: einde van die transactie + 30 dagen ligt ná d. Einde = de
-# vervaldatum (bij een cancel met vervaldatum in het verleden: de cancel-datum).
-# Een nieuwe transactie binnen de 30 dagen wordt zelf de geldende transactie,
-# dus wie op tijd verlengt blijft zonder onderbreking actief.
-con.sql(f"""
-create table gov as
-select p.d, t.msno, t.edate, t.lapse, t.next_tdate,
-       t.lapse + interval {GRACE_DAYS} day > p.d as active
-from peil p
-join tl t on t.tdate <= p.d and (t.next_tdate is null or t.next_tdate > p.d)
-""")
-con.sql("create table firsts as select msno, min(tdate) first from tx group by msno")
-
-# --- Klantenstroom per kwartaal ----------------------------------------------
-# Elke klant die aan begin of eind actief is, valt in precies één groep:
-#   stay       actief begin en eind
-#   new        niet actief begin, wel eind, eerste transactie ooit in dit kwartaal
-#   returning  niet actief begin, wel eind, eerder al klant
-#   churned    actief begin, niet eind: de 30 dagen na de vervaldatum liepen af
-#              in dit kwartaal zonder nieuwe transactie
-#   unexplained  actief begin, niet eind, maar de 30 dagen liepen niet in dit
-#              kwartaal af (mag niet voorkomen)
-# Daarnaast, buiten de som: inout = niet actief begin en niet eind, wel een
-# transactie in het kwartaal (kwam en ging binnen het kwartaal).
+# Een klant valt per kwartaal in precies één groep (zie flow_sql).
+GROUPS = ["stay", "new", "returning", "churned", "inout", "unexplained"]
 
 
 def flow_sql(y, q, select):
+    """Klantenstroom in een kwartaal. Elke klant die aan begin of eind actief is:
+      stay       actief begin en eind
+      new        niet actief begin, wel eind, eerste factuur ooit in dit kwartaal
+      returning  niet actief begin, wel eind, eerder al klant
+      churned    actief begin, niet eind: de 30 dagen na de vervaldatum liepen af
+                 in dit kwartaal zonder nieuwe factuur
+      unexplained  actief begin, niet eind, maar de 30 dagen liepen niet in dit
+                 kwartaal af (mag niet voorkomen)
+    Daarnaast, buiten de som: inout = niet actief begin en niet eind, wel een
+    factuur in het kwartaal (kwam en ging binnen het kwartaal)."""
     d0, qs, d1 = q_begin_peil(y, q), q_start(y, q), q_end(y, q)
     return f"""
-with b as (select msno from gov where d = date '{d0}' and active),
-     e as (select msno from gov where d = date '{d1}' and active),
+with b as (select customer_id from gov where d = date '{d0}' and active),
+     e as (select customer_id from gov where d = date '{d1}' and active),
      g1 as (select * from gov where d = date '{d1}'),
-     txq as (select msno, max(payment_plan_days) maxplan from tx
-             where tdate between date '{qs}' and date '{d1}' group by msno),
-     pop as (select msno from b union select msno from e union select msno from txq),
+     txq as (select distinct customer_id from tx
+             where tdate between date '{qs}' and date '{d1}'),
+     pop as (select customer_id from b union select customer_id from e
+             union select customer_id from txq),
      c as (
-        select pop.msno,
+        select pop.customer_id,
           case
-            when b.msno is not null and e.msno is not null then 'stay'
-            when e.msno is not null then
+            when b.customer_id is not null and e.customer_id is not null then 'stay'
+            when e.customer_id is not null then
               case when f.first >= date '{qs}' then 'new' else 'returning' end
-            when b.msno is not null then
+            when b.customer_id is not null then
               case
                 when g1.lapse + interval {GRACE_DAYS} day
                      between date '{qs}' and date '{d1}' then 'churned'
                 else 'unexplained'
               end
             else 'inout'
-          end as grp,
-          txq.maxplan < {SHORT_PLAN_DAYS} as short
+          end as grp
         from pop
-        left join b using (msno)
-        left join e using (msno)
-        left join g1 using (msno)
-        left join txq using (msno)
-        left join firsts f using (msno)
+        left join b using (customer_id)
+        left join e using (customer_id)
+        left join g1 using (customer_id)
+        left join firsts f using (customer_id)
      )
 {select}
 """
 
 
-GROUPS = ["stay", "new", "returning", "churned", "inout", "unexplained"]
-flows = {}
-for y, q in QUARTERS:
-    res = con.sql(flow_sql(
-        y, q, "select grp, count(*), count(*) filter (where short) from c group by grp"
-    )).fetchall()
-    f = {g: 0 for g in GROUPS}
-    f["inoutShort"] = 0
-    for grp, n, n_short in res:
-        f[grp] = n
-        if grp == "inout":
-            f["inoutShort"] = n_short
-    f["begin"] = f["stay"] + f["churned"] + f["unexplained"]
-    f["end"] = f["stay"] + f["new"] + f["returning"]
-    flows[(y, q)] = f
-
-# Controle: begin + nieuw + terug - churn = eind, rest 0. Begin en
-# eind komen rechtstreeks uit de peildata, niet uit de groepen.
-active = dict(con.sql("select d, count(*) from gov where active group by d").fetchall())
-fail = False
-for y, q in QUARTERS:
-    f = flows[(y, q)]
-    begin, end = active.get(q_begin_peil(y, q), 0), active.get(q_end(y, q), 0)
-    f["rest"] = begin + f["new"] + f["returning"] - f["churned"] - end
-    if f["rest"] or f["unexplained"] or f["begin"] != begin or f["end"] != end:
-        fail = True
-        print(f"{label(y, q)}: rest {f['rest']:+,}, onverklaard {f['unexplained']:,}, "
-              f"begin {begin:,} vs groepen {f['begin']:,}, eind {end:,} vs groepen {f['end']:,}")
-        ids = [m for (m,) in con.sql(flow_sql(
-            y, q, "select msno from c where grp = 'unexplained' order by msno limit 5"
-        )).fetchall()]
-        for m in ids:
-            print(f"\n  {m}")
-            print(f"    {'transactie':<12}{'vervalt':<12}{'cancel':>6}{'dagen':>6}{'betaald':>9}")
-            for t, e, c, p, a in con.execute(
-                "select tdate, edate, is_cancel, payment_plan_days, actual_amount_paid "
-                "from tx where msno = ? order by tdate, is_cancel, edate", [m]
-            ).fetchall():
-                print(f"    {t!s:<12}{e!s:<12}{c:>6}{p:>6}{a:>9}")
-if fail:
-    sys.exit("Klantenstroom sluit niet. Niets weggeschreven.")
-
-# --- Omzet ------------------------------------------------------------------
-# actual_amount_paid, alleen regels met is_cancel = 0.
-revenue_twd = {(y, q): n for y, q, n in con.sql("""
-select year(tdate) y, quarter(tdate) q, sum(actual_amount_paid)
-from tx where is_cancel = 0 group by all
-""").fetchall()}
-
-# members_v3: alleen ter controle van de dekking, niet om te filteren.
-members_cover = con.execute(f"""
-select count(*) filter (where m.msno is not null) * 1.0 / count(*)
-from (select distinct msno from tx) c
-left join (select distinct msno from '{RAW / "members_v3.parquet"}') m using (msno)
-""").fetchall()[0][0]
-
-# --- Kwartaalcijfers --------------------------------------------------------
-rows = {}
-for y, q in QUARTERS:
-    f = flows[(y, q)]
-    begin, end = f["begin"], f["end"]
-    rev_eur = revenue_twd.get((y, q), 0) / TWD_PER_EUR
-    rows[(y, q)] = dict(
-        label=label(y, q),
-        activeBegin=begin,
-        activeEnd=end,
-        newCustomers=f["new"],
-        reacquiredCustomers=f["returning"],
-        churn=f["churned"],
-        churnRate=f["churned"] / begin if begin else None,
-        revenueEur=rev_eur,
-        marginPerCustomer=rev_eur * MARGIN / ((begin + end) / 2),
-    )
-
-for i, (y, q) in enumerate(QUARTERS):
-    if (y, q) not in DASHBOARD:
-        continue
-    r = rows[(y, q)]
-    # Verwachte churn: churnpercentage zelfde kwartaal vorig jaar (waterfall).
-    prev = rows.get((y - 1, q))
-    prev_rate = prev["churnRate"] if prev else None
-    r["expectedChurn"] = None if prev_rate is None else prev_rate * r["activeBegin"]
-    r["expectedChurnRate"] = prev_rate
-    # CLV-retentie: 1 - gemiddeld churnpercentage van de vorige 4 kwartalen
-    # (of van de kwartalen die er zijn). Zijn er geen, dan de werkelijke churn
-    # van dit kwartaal (alleen Q2 2015: Q1 2015 heeft geen beginklanten).
-    prior = [rows[k]["churnRate"] for k in QUARTERS[max(0, i - 4):i]
-             if rows[k]["churnRate"] is not None]
-    if prior:
-        retention = 1 - sum(prior) / len(prior)
-        r["clvBasis"] = "trailing"
-    else:
-        retention = 1 - r["churnRate"]
-        r["clvBasis"] = "actual"
-    r["retentionQuarters"] = len(prior)
-    r["retention"] = retention
-    r["avgClv"] = clv(r["marginPerCustomer"], retention)
-    r["customerEquity"] = r["activeEnd"] * r["avgClv"]
-
-# --- Waterfalls: jaar en kwartaal (CLAUDE.md, Verklaring van de verandering) --
-# Beide tegen de CLV aan het begin van de periode (V0). De CLV-verandering is
-# gesplitst: Vm = CLV met de marge van het eind en de retentie van het begin;
-# marge-effect = (Vm - V0) x N1, retentie-effect = (V1 - Vm) x N1.
-# Zonder verwachte churn (geen vorig jaar) is er geen waterfall: veld null.
 def waterfall(begin, periods, expected):
-    """begin = kwartaal aan het begin; periods = kwartalen in de periode (laatste = eind)."""
+    """Waterfall tegen de CLV aan het begin (V0); CLV-verandering gesplitst in
+    marge-effect (Vm - V0) x N1 en retentie-effect (V1 - Vm) x N1.
+    begin = kwartaal aan het begin; periods = kwartalen in de periode (laatste = eind)."""
     end = periods[-1]
     v0, v1 = begin["avgClv"], end["avgClv"]
     n0, n1 = begin["activeEnd"], end["activeEnd"]
@@ -333,19 +150,6 @@ def waterfall(begin, periods, expected):
     }
 
 
-for i, (y, q) in enumerate(DASHBOARD):
-    r = rows[(y, q)]
-    assert r["newCustomers"] + r["reacquiredCustomers"] == r["activeEnd"] - r["activeBegin"] + r["churn"]
-    r["waterfall"] = None
-    r["yearWaterfall"] = None
-    if i == 0 or r["expectedChurn"] is None:
-        continue
-    r["waterfall"] = waterfall(rows[DASHBOARD[i - 1]], [r], expected=True)
-    if (y - 1, q) in DASHBOARD:
-        r["yearWaterfall"] = waterfall(rows[(y - 1, q)], [rows[k] for k in DASHBOARD[i - 3:i + 1]],
-                                       expected=False)
-
-# --- Vergelijkingen en antwoordzin (voor het scherm; de app rekent niets) -----
 def change(cur, base, key="customerEquity"):
     """Verschil met een eerder kwartaal: absoluut en relatief."""
     if base is None:
@@ -369,179 +173,293 @@ COMPARE = {
 }
 
 
-for i, (y, q) in enumerate(DASHBOARD):
-    r = rows[(y, q)]
-    r["acquiredCustomers"] = r["newCustomers"] + r["reacquiredCustomers"]
-    prev_q = rows[DASHBOARD[i - 1]] if i > 0 else None
-    year_ago = rows[(y - 1, q)] if (y - 1, q) in DASHBOARD else None
-    r["equityVsPrevQuarter"] = change(r, prev_q)
-    r["equityVsYearAgo"] = change(r, year_ago)
-    r["acquiredVsPrevQuarter"] = change(r, prev_q, "acquiredCustomers")
-    r["acquiredVsYearAgo"] = change(r, year_ago, "acquiredCustomers")
-    r["churnRateVsPrevQuarter"] = rate_change(r, prev_q)
-    r["churnRateVsYearAgo"] = rate_change(r, year_ago)
-    r["avgClvVsPrevQuarter"] = change(r, prev_q, "avgClv")
-    r["avgClvVsYearAgo"] = change(r, year_ago, "avgClv")
-    r["churnRateVsExpected"] = (None if r["expectedChurnRate"] is None
-                                else r["churnRate"] - r["expectedChurnRate"])
-    for name, key in COMPARE.items():
-        r[f"{name}VsPrevQuarter"] = change(r, prev_q, key)
-        r[f"{name}VsYearAgo"] = change(r, year_ago, key)
-    r["retentionVsPrevQuarter"] = rate_change(r, prev_q, "retention")
-    r["retentionVsYearAgo"] = rate_change(r, year_ago, "retention")
-    # Werkelijke min verwachte churn (aantal), voor de hover van de Churn-tegel.
-    r["churnVsExpectedCount"] = (None if r["expectedChurn"] is None
-                                 else round(r["churn"] - r["expectedChurn"], 1))
-    # Rekenvoorbeeld "How we calculate": verwachte duur als klant (max. 20
-    # kwartalen, afgerond op 0,1 zoals in het ontwerp) en marge x die duur.
-    # Met disconto is de uitkomst avgClv.
-    ret = r["retention"]
-    quarters_as_customer = round(ret * (1 - ret**HORIZON) / (1 - ret), 1)
-    r["clvExample"] = {
-        "churnRate": round(1 - ret, 6),
-        "expectedQuarters": quarters_as_customer,
-        "undiscountedValue": round(r["marginPerCustomer"] * quarters_as_customer, 4),
-    }
-    r["yearSummary"] = None
-    if year_ago is not None:
-        last4 = [rows[k] for k in DASHBOARD[i - 3:i + 1]]
-        with_exp = [x for x in last4 if x["expectedChurn"] is not None]
-        r["yearSummary"] = {
-            "acquiredCustomers": sum(x["newCustomers"] + x["reacquiredCustomers"] for x in last4),
-            "newCustomers": sum(x["newCustomers"] for x in last4),
-            "reacquiredCustomers": sum(x["reacquiredCustomers"] for x in last4),
-            "avgClvChange": round(r["avgClv"] - year_ago["avgClv"], 4),
-            "churnQuarters": len(with_exp),
-            "churnVsExpected": None if not with_exp else round(
-                sum(x["expectedChurn"] - x["churn"] for x in with_exp), 1),
-        }
-
-# Controle: elke waterfall sluit exact (afwijking < 1 euro).
-ALL_WF = [(rows[k]["label"], kind, rows[k][field]) for k in DASHBOARD
-          for kind, field in (("kwartaal", "waterfall"), ("jaar", "yearWaterfall"))
-          if rows[k][field] is not None]
-bad = [(lbl, kind, w["_deviation"]) for lbl, kind, w in ALL_WF if abs(w["_deviation"]) >= 1]
-if bad:
-    for lbl, kind, dev in bad:
-        print(f"{lbl} ({kind}): afwijking {dev:+,.2f} EUR")
-    sys.exit("Waterfall sluit niet. Niets weggeschreven.")
-
-
 def public(w):
     return None if w is None else {k: v for k, v in w.items() if not k.startswith("_")}
 
 
-# --- Wegschrijven ----------------------------------------------------------
-out = []
-for y, q in DASHBOARD:
-    r = rows[(y, q)]
-    out.append({
-        "label": r["label"],
-        "activeBegin": r["activeBegin"],
-        "activeEnd": r["activeEnd"],
-        "newCustomers": r["newCustomers"],
-        "reacquiredCustomers": r["reacquiredCustomers"],
-        "acquiredCustomers": r["newCustomers"] + r["reacquiredCustomers"],
-        "churn": r["churn"],
-        "expectedChurn": None if r["expectedChurn"] is None else round(r["expectedChurn"], 1),
-        "churnRate": round(r["churnRate"], 6),
-        "expectedChurnRate": None if r["expectedChurnRate"] is None else round(r["expectedChurnRate"], 6),
-        "churnRateVsExpected": None if r["churnRateVsExpected"] is None else round(r["churnRateVsExpected"], 6),
-        "revenueEur": round(r["revenueEur"], 2),
-        "marginPerCustomer": round(r["marginPerCustomer"], 12),
-        "retention": round(r["retention"], 12),
-        "retentionQuarters": r["retentionQuarters"],
-        "clvBasis": r["clvBasis"],
-        "avgClv": round(r["avgClv"], 12),
-        "customerEquity": round(r["customerEquity"], 2),
-        "equityVsPrevQuarter": r["equityVsPrevQuarter"],
-        "equityVsYearAgo": r["equityVsYearAgo"],
-        "acquiredVsPrevQuarter": r["acquiredVsPrevQuarter"],
-        "acquiredVsYearAgo": r["acquiredVsYearAgo"],
-        "churnRateVsPrevQuarter": r["churnRateVsPrevQuarter"],
-        "churnRateVsYearAgo": r["churnRateVsYearAgo"],
-        "avgClvVsPrevQuarter": r["avgClvVsPrevQuarter"],
-        "avgClvVsYearAgo": r["avgClvVsYearAgo"],
-        **{f"{name}Vs{when}": r[f"{name}Vs{when}"]
-           for name in [*COMPARE, "retention"] for when in ("PrevQuarter", "YearAgo")},
-        "churnVsExpectedCount": r["churnVsExpectedCount"],
-        "yearSummary": r["yearSummary"],
-        "clvExample": r["clvExample"],
-        "waterfall": public(r["waterfall"]),
-        "yearWaterfall": public(r["yearWaterfall"]),
-    })
-# Controle op de weggeschreven waarden (wat de app leest), per kwartaal:
-# (a) customer equity = active customers x average CLV
-# (b) active customers = vorig kwartaal + new + reacquired - churn
-# (c) average CLV opnieuw berekend uit margin per customer en retention
-#     (afwijking x active customers, dus in euro customer equity)
-problems = []
-max_dev = {"a": 0.0, "b": 0, "c": 0.0}
-for i, o in enumerate(out):
-    dev_a = o["activeEnd"] * o["avgClv"] - o["customerEquity"]
-    prev_end = out[i - 1]["activeEnd"] if i > 0 else o["activeBegin"]
-    dev_b = (prev_end + o["newCustomers"] + o["reacquiredCustomers"] - o["churn"]) - o["activeEnd"]
-    dev_b += abs(o["activeBegin"] - prev_end)
-    dev_c = (clv(o["marginPerCustomer"], o["retention"]) - o["avgClv"]) * o["activeEnd"]
-    max_dev["a"] = max(max_dev["a"], abs(dev_a))
-    max_dev["b"] = max(max_dev["b"], abs(dev_b))
-    max_dev["c"] = max(max_dev["c"], abs(dev_c))
-    if abs(dev_a) > 1:
-        problems.append(f"{o['label']}: CE - klanten x CLV = {dev_a:+,.2f} EUR")
-    if dev_b != 0:
-        problems.append(f"{o['label']}: klantenstroom wijkt {dev_b:+,} klanten af")
-    if abs(dev_c) > 1:
-        problems.append(f"{o['label']}: CLV uit marge en retentie wijkt {dev_c:+,.2f} EUR af (x klanten)")
-if problems:
-    print("\n".join(problems))
-    sys.exit("Controle op de drivers faalt. Niets weggeschreven.")
+def build(input_path):
+    """Rekent alle kwartaalcijfers uit. Stopt (sys.exit) als een controle faalt."""
+    con = duckdb.connect()
+    con.sql(f"""
+    create table tx as
+    select customer_id, invoice_date as tdate, expire_date as edate, amount_eur::double as amount
+    from '{input_path}'
+    """)
+    n_rows, n_customers, first_tx, last_tx = con.sql(
+        "select count(*), count(distinct customer_id), min(tdate), max(tdate) from tx"
+    ).fetchall()[0]
 
-OUT.write_text(json.dumps(out, indent=2) + "\n")
+    # --- Tijdlijn per klant ---------------------------------------------------
+    # Elke factuur zet het einde van het abonnement op haar vervaldatum en geldt
+    # tot de volgende factuur.
+    con.sql("""
+    create table tl as
+    select *, lead(tdate) over w as next_tdate, edate as lapse
+    from tx
+    window w as (partition by customer_id order by tdate)
+    """)
 
-# --- Uitvoer ----------------------------------------------------------------
-print("Weggelaten klanten")
-print(f"  na opschonen                         {n0:>10,}")
-print(f"  besluit 1: ooit methode 39           {n1 - n0:>+10,}")
-print(f"  besluit 2: nooit betaald >= 30 dagen {n2 - n1:>+10,}")
-print(f"  over                                 {n2:>10,}")
-print(f"  (transacties vóór eerste betaalde abonnement weggelaten: {tx_before_start:,})\n")
-print(f"Geschreven: {OUT.relative_to(ROOT)}  ({len(out)} kwartalen)")
-print("Controle drivers (grootste afwijking over alle kwartalen):")
-print(f"  (a) CE = klanten x CLV:                 {max_dev['a']:.4f} EUR")
-print(f"  (b) klanten = vorig + new + reacq - churn: {max_dev['b']} klanten")
-print(f"  (c) CLV uit marge en retentie (x klanten): {max_dev['c']:.4f} EUR")
-print(f"Klanten met record in members_v3: {members_cover:.1%}\n")
+    # --- Peildata ---------------------------------------------------------------
+    peil = [q_begin_peil(*QUARTERS[0])] + [q_end(y, q) for y, q in QUARTERS]
+    con.sql("create table peil (d date)")
+    con.executemany("insert into peil values (?)", [[d] for d in peil])
 
-print("Waterfalls (EUR, tegen begin-CLV)")
-for lbl, kind, w in ALL_WF:
-    parts = "  ".join(f"{k} {v:+,.0f}" for k, v in w["parts"].items())
-    print(f"  {lbl} {kind:<8} {w['fromLabel']} -> {w['toLabel']}: {parts}")
-    print(f"  {'':<17} som {w['_sum']:+,.0f}  verandering {w['equityChange']:+,.0f}  "
-          f"afwijking {w['_deviation']:.4f}")
-print()
+    # Geldende factuur per klant op peildatum d: tdate <= d < next_tdate.
+    # Actief op d: vervaldatum + 30 dagen ligt ná d. Een nieuwe factuur binnen de
+    # 30 dagen wordt zelf de geldende, dus wie op tijd verlengt blijft actief.
+    con.sql(f"""
+    create table gov as
+    select p.d, t.customer_id, t.edate, t.lapse, t.next_tdate,
+           t.lapse + interval {GRACE_DAYS} day > p.d as active
+    from peil p
+    join tl t on t.tdate <= p.d and (t.next_tdate is null or t.next_tdate > p.d)
+    """)
+    con.sql("create table firsts as select customer_id, min(tdate) first from tx group by customer_id")
 
-hdr = (f"{'kwartaal':<8} {'begin':>9} {'eind':>9} {'nieuw':>8} {'churn':>8} "
-       f"{'verw.churn':>10} {'omzet EUR':>12} {'marge/kl':>8} {'retentie':>8} "
-       f"{'basis':>10} {'CLV':>7} {'cust. equity':>13} {'in&uit':>8} {'w.v.<30d':>8}")
-print(hdr)
-print("-" * len(hdr))
-for (y, q), r in zip(DASHBOARD, out):
-    f = flows[(y, q)]
-    ec = "-" if r["expectedChurn"] is None else f"{r['expectedChurn']:,.0f}"
-    basis = f"{r['clvBasis']}({r['retentionQuarters']})"
-    print(f"{r['label']:<8} {r['activeBegin']:>9,} {r['activeEnd']:>9,} "
-          f"{r['newCustomers']:>8,} {r['churn']:>8,} {ec:>10} "
-          f"{r['revenueEur']:>12,.0f} {r['marginPerCustomer']:>8.2f} "
-          f"{r['retention']:>8.3f} {basis:>10} {r['avgClv']:>7.2f} "
-          f"{r['customerEquity']:>13,.0f} {f['inout']:>8,} {f['inoutShort']:>8,}")
+    # --- Klantenstroom per kwartaal --------------------------------------------
+    flows = {}
+    for y, q in QUARTERS:
+        f = {g: 0 for g in GROUPS}
+        for grp, n in con.sql(flow_sql(y, q, "select grp, count(*) from c group by grp")).fetchall():
+            f[grp] = n
+        f["begin"] = f["stay"] + f["churned"] + f["unexplained"]
+        f["end"] = f["stay"] + f["new"] + f["returning"]
+        flows[(y, q)] = f
 
-print("\nKlantenstroom: begin + nieuw + terug - churn = eind")
-hdr = (f"{'kwartaal':<8} {'begin':>9} {'blijft':>9} {'+nieuw':>8} {'+terug':>8} "
-       f"{'-churn':>8} {'eind':>9} {'rest':>5}")
-print(hdr)
-print("-" * len(hdr))
-for y, q in DASHBOARD:
-    f = flows[(y, q)]
-    print(f"{label(y, q):<8} {f['begin']:>9,} {f['stay']:>9,} {f['new']:>8,} "
-          f"{f['returning']:>8,} {f['churned']:>8,} "
-          f"{f['end']:>9,} {f['rest']:>5,}")
+    # Controle: begin + nieuw + terug - churn = eind, rest 0. Begin en eind komen
+    # rechtstreeks uit de peildata, niet uit de groepen.
+    active = dict(con.sql("select d, count(*) from gov where active group by d").fetchall())
+    fail = False
+    for y, q in QUARTERS:
+        f = flows[(y, q)]
+        begin, end = active.get(q_begin_peil(y, q), 0), active.get(q_end(y, q), 0)
+        f["rest"] = begin + f["new"] + f["returning"] - f["churned"] - end
+        if f["rest"] or f["unexplained"] or f["begin"] != begin or f["end"] != end:
+            fail = True
+            print(f"{label(y, q)}: rest {f['rest']:+,}, onverklaard {f['unexplained']:,}, "
+                  f"begin {begin:,} vs groepen {f['begin']:,}, eind {end:,} vs groepen {f['end']:,}")
+    if fail:
+        sys.exit("Klantenstroom sluit niet. Niets weggeschreven.")
+
+    # --- Omzet en marge ---------------------------------------------------------
+    money = {(y, q): (rev, marg) for y, q, rev, marg in con.sql(f"""
+    select year(tdate) y, quarter(tdate) q, sum(amount), sum(amount - {COST_EUR})
+    from tx group by all
+    """).fetchall()}
+
+    # --- Kwartaalcijfers --------------------------------------------------------
+    rows = {}
+    for y, q in QUARTERS:
+        f = flows[(y, q)]
+        begin, end = f["begin"], f["end"]
+        rev_eur, margin_eur = money.get((y, q), (0, 0))
+        rows[(y, q)] = dict(
+            label=label(y, q),
+            activeBegin=begin,
+            activeEnd=end,
+            newCustomers=f["new"],
+            reacquiredCustomers=f["returning"],
+            churn=f["churned"],
+            churnRate=f["churned"] / begin if begin else None,
+            revenueEur=rev_eur,
+            marginPerCustomer=margin_eur / ((begin + end) / 2),
+        )
+
+    for i, (y, q) in enumerate(QUARTERS):
+        if (y, q) not in DASHBOARD:
+            continue
+        r = rows[(y, q)]
+        # Verwachte churn: churnpercentage zelfde kwartaal vorig jaar.
+        prev = rows.get((y - 1, q))
+        prev_rate = prev["churnRate"] if prev else None
+        r["expectedChurn"] = None if prev_rate is None else prev_rate * r["activeBegin"]
+        r["expectedChurnRate"] = prev_rate
+        # CLV-retentie: 1 - gemiddeld churnpercentage van de vorige 4 kwartalen
+        # (of van de kwartalen die er zijn; zijn er geen, dan dit kwartaal).
+        prior = [rows[k]["churnRate"] for k in QUARTERS[max(0, i - 4):i]
+                 if rows[k]["churnRate"] is not None]
+        if prior:
+            retention = 1 - sum(prior) / len(prior)
+        else:
+            retention = 1 - r["churnRate"]
+        r["retentionQuarters"] = len(prior)
+        r["retention"] = retention
+        r["avgClv"] = clv(r["marginPerCustomer"], retention)
+        r["customerEquity"] = r["activeEnd"] * r["avgClv"]
+
+    # --- Waterfalls: jaar en kwartaal --------------------------------------------
+    for i, (y, q) in enumerate(DASHBOARD):
+        r = rows[(y, q)]
+        assert r["newCustomers"] + r["reacquiredCustomers"] == r["activeEnd"] - r["activeBegin"] + r["churn"]
+        r["waterfall"] = None
+        r["yearWaterfall"] = None
+        if i == 0 or r["expectedChurn"] is None:
+            continue
+        r["waterfall"] = waterfall(rows[DASHBOARD[i - 1]], [r], expected=True)
+        if (y - 1, q) in DASHBOARD:
+            r["yearWaterfall"] = waterfall(rows[(y - 1, q)], [rows[k] for k in DASHBOARD[i - 3:i + 1]],
+                                           expected=False)
+
+    # --- Vergelijkingen en antwoordzin (voor het scherm; de app rekent niets) ---
+    for i, (y, q) in enumerate(DASHBOARD):
+        r = rows[(y, q)]
+        r["acquiredCustomers"] = r["newCustomers"] + r["reacquiredCustomers"]
+        prev_q = rows[DASHBOARD[i - 1]] if i > 0 else None
+        year_ago = rows[(y - 1, q)] if (y - 1, q) in DASHBOARD else None
+        r["equityVsPrevQuarter"] = change(r, prev_q)
+        r["equityVsYearAgo"] = change(r, year_ago)
+        r["acquiredVsPrevQuarter"] = change(r, prev_q, "acquiredCustomers")
+        r["acquiredVsYearAgo"] = change(r, year_ago, "acquiredCustomers")
+        r["churnRateVsPrevQuarter"] = rate_change(r, prev_q)
+        r["churnRateVsYearAgo"] = rate_change(r, year_ago)
+        r["avgClvVsPrevQuarter"] = change(r, prev_q, "avgClv")
+        r["avgClvVsYearAgo"] = change(r, year_ago, "avgClv")
+        r["churnRateVsExpected"] = (None if r["expectedChurnRate"] is None
+                                    else r["churnRate"] - r["expectedChurnRate"])
+        for name, key in COMPARE.items():
+            r[f"{name}VsPrevQuarter"] = change(r, prev_q, key)
+            r[f"{name}VsYearAgo"] = change(r, year_ago, key)
+        r["retentionVsPrevQuarter"] = rate_change(r, prev_q, "retention")
+        r["retentionVsYearAgo"] = rate_change(r, year_ago, "retention")
+        # Werkelijke min verwachte churn (aantal), voor de hover van de Churn-tegel.
+        r["churnVsExpectedCount"] = (None if r["expectedChurn"] is None
+                                     else round(r["churn"] - r["expectedChurn"], 1))
+        # Rekenvoorbeeld "How we calculate": verwachte duur als klant (max. 20
+        # kwartalen, afgerond op 0,1) en marge x die duur. Met disconto: avgClv.
+        ret = r["retention"]
+        quarters_as_customer = round(ret * (1 - ret**HORIZON) / (1 - ret), 1)
+        r["clvExample"] = {
+            "churnRate": round(1 - ret, 6),
+            "expectedQuarters": quarters_as_customer,
+            "undiscountedValue": round(r["marginPerCustomer"] * quarters_as_customer, 4),
+        }
+        r["yearSummary"] = None
+        if year_ago is not None:
+            last4 = [rows[k] for k in DASHBOARD[i - 3:i + 1]]
+            with_exp = [x for x in last4 if x["expectedChurn"] is not None]
+            r["yearSummary"] = {
+                "acquiredCustomers": sum(x["newCustomers"] + x["reacquiredCustomers"] for x in last4),
+                "newCustomers": sum(x["newCustomers"] for x in last4),
+                "reacquiredCustomers": sum(x["reacquiredCustomers"] for x in last4),
+                "avgClvChange": round(r["avgClv"] - year_ago["avgClv"], 4),
+                "churnQuarters": len(with_exp),
+                "churnVsExpected": None if not with_exp else round(
+                    sum(x["expectedChurn"] - x["churn"] for x in with_exp), 1),
+            }
+
+    # Controle: elke waterfall sluit exact (afwijking < 1 euro).
+    all_wf = [(rows[k]["label"], kind, rows[k][field]) for k in DASHBOARD
+              for kind, field in (("kwartaal", "waterfall"), ("jaar", "yearWaterfall"))
+              if rows[k][field] is not None]
+    bad = [(lbl, kind, w["_deviation"]) for lbl, kind, w in all_wf if abs(w["_deviation"]) >= 1]
+    if bad:
+        for lbl, kind, dev in bad:
+            print(f"{lbl} ({kind}): afwijking {dev:+,.2f} EUR")
+        sys.exit("Waterfall sluit niet. Niets weggeschreven.")
+
+    # --- Uitvoer (zelfde vorm als voorheen) --------------------------------------
+    out = []
+    for y, q in DASHBOARD:
+        r = rows[(y, q)]
+        out.append({
+            "label": r["label"],
+            "activeBegin": r["activeBegin"],
+            "activeEnd": r["activeEnd"],
+            "newCustomers": r["newCustomers"],
+            "reacquiredCustomers": r["reacquiredCustomers"],
+            "acquiredCustomers": r["newCustomers"] + r["reacquiredCustomers"],
+            "churn": r["churn"],
+            "expectedChurn": None if r["expectedChurn"] is None else round(r["expectedChurn"], 1),
+            "churnRate": round(r["churnRate"], 6),
+            "expectedChurnRate": None if r["expectedChurnRate"] is None else round(r["expectedChurnRate"], 6),
+            "churnRateVsExpected": None if r["churnRateVsExpected"] is None else round(r["churnRateVsExpected"], 6),
+            "revenueEur": round(r["revenueEur"], 2),
+            "marginPerCustomer": round(r["marginPerCustomer"], 12),
+            "retention": round(r["retention"], 12),
+            "retentionQuarters": r["retentionQuarters"],
+            "avgClv": round(r["avgClv"], 12),
+            "customerEquity": round(r["customerEquity"], 2),
+            "equityVsPrevQuarter": r["equityVsPrevQuarter"],
+            "equityVsYearAgo": r["equityVsYearAgo"],
+            "acquiredVsPrevQuarter": r["acquiredVsPrevQuarter"],
+            "acquiredVsYearAgo": r["acquiredVsYearAgo"],
+            "churnRateVsPrevQuarter": r["churnRateVsPrevQuarter"],
+            "churnRateVsYearAgo": r["churnRateVsYearAgo"],
+            "avgClvVsPrevQuarter": r["avgClvVsPrevQuarter"],
+            "avgClvVsYearAgo": r["avgClvVsYearAgo"],
+            **{f"{name}Vs{when}": r[f"{name}Vs{when}"]
+               for name in [*COMPARE, "retention"] for when in ("PrevQuarter", "YearAgo")},
+            "churnVsExpectedCount": r["churnVsExpectedCount"],
+            "yearSummary": r["yearSummary"],
+            "clvExample": r["clvExample"],
+            "waterfall": public(r["waterfall"]),
+            "yearWaterfall": public(r["yearWaterfall"]),
+        })
+
+    # Controle op de weggeschreven waarden (wat de app leest), per kwartaal:
+    # (a) customer equity = active customers x average CLV
+    # (b) active customers = vorig kwartaal + new + reacquired - churn
+    # (c) average CLV opnieuw berekend uit margin per customer en retention
+    problems = []
+    max_dev = {"a": 0.0, "b": 0, "c": 0.0}
+    for i, o in enumerate(out):
+        dev_a = o["activeEnd"] * o["avgClv"] - o["customerEquity"]
+        prev_end = out[i - 1]["activeEnd"] if i > 0 else o["activeBegin"]
+        dev_b = (prev_end + o["newCustomers"] + o["reacquiredCustomers"] - o["churn"]) - o["activeEnd"]
+        dev_b += abs(o["activeBegin"] - prev_end)
+        dev_c = (clv(o["marginPerCustomer"], o["retention"]) - o["avgClv"]) * o["activeEnd"]
+        max_dev["a"] = max(max_dev["a"], abs(dev_a))
+        max_dev["b"] = max(max_dev["b"], abs(dev_b))
+        max_dev["c"] = max(max_dev["c"], abs(dev_c))
+        if abs(dev_a) > 1:
+            problems.append(f"{o['label']}: CE - klanten x CLV = {dev_a:+,.2f} EUR")
+        if dev_b != 0:
+            problems.append(f"{o['label']}: klantenstroom wijkt {dev_b:+,} klanten af")
+        if abs(dev_c) > 1:
+            problems.append(f"{o['label']}: CLV uit marge en retentie wijkt {dev_c:+,.2f} EUR af (x klanten)")
+    if problems:
+        print("\n".join(problems))
+        sys.exit("Controle op de drivers faalt. Niets weggeschreven.")
+
+    return {
+        "out": out, "flows": flows, "all_wf": all_wf, "max_dev": max_dev,
+        "input": {"rows": n_rows, "customers": n_customers, "first": first_tx, "last": last_tx},
+    }
+
+
+def report(res, out_path):
+    out, flows, inp = res["out"], res["flows"], res["input"]
+    print(f"Invoer: {inp['rows']:,} facturen, {inp['customers']:,} klanten, "
+          f"{inp['first']} t/m {inp['last']}")
+    print(f"Geschreven: {out_path}  ({len(out)} kwartalen)")
+    md = res["max_dev"]
+    print("Controle drivers (grootste afwijking over alle kwartalen):")
+    print(f"  (a) CE = klanten x CLV:                    {md['a']:.4f} EUR")
+    print(f"  (b) klanten = vorig + new + reacq - churn: {md['b']} klanten")
+    print(f"  (c) CLV uit marge en retentie (x klanten): {md['c']:.4f} EUR\n")
+
+    print("Waterfalls (EUR, tegen begin-CLV): grootste afwijking "
+          f"{max(abs(w['_deviation']) for _, _, w in res['all_wf']):.4f} over {len(res['all_wf'])} waterfalls\n")
+
+    hdr = (f"{'kwartaal':<8} {'begin':>7} {'eind':>7} {'nieuw':>6} {'terug':>6} {'churn':>6} "
+           f"{'churn%':>7} {'verw.':>7} {'marge/kl':>8} {'retentie':>8} {'CLV':>8} "
+           f"{'cust. equity':>13} {'in&uit':>6}")
+    print(hdr)
+    print("-" * len(hdr))
+    for (y, q), r in zip(DASHBOARD, out):
+        ec = "-" if r["expectedChurn"] is None else f"{r['expectedChurn']:,.0f}"
+        print(f"{r['label']:<8} {r['activeBegin']:>7,} {r['activeEnd']:>7,} "
+              f"{r['newCustomers']:>6,} {r['reacquiredCustomers']:>6,} {r['churn']:>6,} "
+              f"{r['churnRate']:>7.2%} {ec:>7} {r['marginPerCustomer']:>8.2f} "
+              f"{r['retention']:>8.4f} {r['avgClv']:>8.2f} "
+              f"{r['customerEquity']:>13,.0f} {flows[(y, q)]['inout']:>6,}")
+
+
+if __name__ == "__main__":
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--input", default=str(DEFAULT_INPUT))
+    ap.add_argument("--out", default=str(DEFAULT_OUT))
+    args = ap.parse_args()
+    res = build(args.input)
+    Path(args.out).write_text(json.dumps(res["out"], indent=2) + "\n")
+    report(res, args.out)
