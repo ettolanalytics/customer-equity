@@ -35,7 +35,7 @@ function answer({ current, vsYearLabel }: View): string {
 function App() {
   // Gedeelde hover over alle grafieken, zoals in het ontwerp.
   const [hover, setHover] = useState<number | null>(null)
-  // Gekozen kwartaal (CLAUDE.md, Schermteksten 6); standaard Q4 2016.
+  // Gekozen kwartaal (CLAUDE.md, Schermteksten 6); standaard het laatste kwartaal.
   const [selected, setSelected] = useState(defaultIndex)
   const view = viewFor(selected)
   const { current } = view

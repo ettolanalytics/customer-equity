@@ -137,7 +137,7 @@ export type View = {
   current: Quarter
   previous: Quarter
   yearAgo: Quarter
-  /** "vs Q3" en "vs Q4 2015", zoals in het ontwerp. */
+  /** "vs Q2" en "vs Q3 2025", zoals in het ontwerp. */
   vsQuarterLabel: string
   vsYearLabel: string
 }

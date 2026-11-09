@@ -52,7 +52,7 @@ export const gb = {
     'M',
 }
 
-/** "Q4 2016" → "Q4 '16" */
+/** "Q3 2026" → "Q3 '26" */
 export function quarterShort(label: string): string {
   const [q, year] = label.split(' ')
   return `${q} '${year.slice(2)}`

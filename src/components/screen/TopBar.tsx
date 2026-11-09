@@ -1,5 +1,7 @@
-// Kop volgens het ontwerp (CLAUDE.md, Schermteksten 6).
-// Kwartaalknop: kiest Q2-Q4 2016. Export opent het afdrukvenster voor "Opslaan als PDF".
+// Kop volgens het ontwerp (CLAUDE.md, Schermteksten 6): fictief bedrijf Beanrise Coffee,
+// met zichtbaar label dat het om synthetische demodata gaat (ook in de PDF-export).
+// Kwartaalknop: kiest uit de kwartalen waarvoor het hele scherm gevuld is.
+// Export opent het afdrukvenster voor "Opslaan als PDF".
 import { quarters, selectable } from '../../lib/quarters'
 
 type Props = { selected: number; onSelect: (index: number) => void }
@@ -13,12 +15,13 @@ export function TopBar({ selected, onSelect }: Props) {
             <path d="M4 18l5-6 4 3 7-9" />
           </svg>
         </span>
-        <button type="button" className="tbtn" style={{ borderColor: 'transparent', padding: '0 8px', fontWeight: 500 }}>
-          KKBox (public dataset)
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8a8984" strokeWidth="2" aria-hidden="true">
-            <path d="M6 9l6 6 6-6" />
-          </svg>
-        </button>
+        <div className="brand">
+          <span className="brand-name">Beanrise Coffee</span>
+          <span className="brand-tag hide-s">fresh beans, monthly</span>
+          <span className="demo-badge" title="Beanrise Coffee is a fictional company. All figures are synthetic demo data.">
+            Synthetic demo data
+          </span>
+        </div>
       </div>
       <div className="topbar-r">
         {/* Uiterlijk van de knop uit het ontwerp, met een onzichtbare keuzelijst erover. */}
