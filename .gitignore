@@ -34,3 +34,6 @@ data/synthetic/
 
 # Kwartaalcijfers: worden bij elke build uit Supabase gehaald (scripts/fetch-quarters.mjs)
 src/data/quarters.json
+
+# Oud screenshot van het KKBox-dashboard: alleen lokaal, nooit in git
+Customer Equity-screenshot.png
