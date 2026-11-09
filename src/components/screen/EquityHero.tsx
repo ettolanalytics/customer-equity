@@ -1,9 +1,9 @@
 // Hero-kaart (customer equity met vergelijkingen) en lijngrafiek
 // "Customer Equity over time": de laatste drie jaar, één lijn per jaar.
 import { gb } from '../../lib/format'
-import { type Change, type HoverProps, type View } from '../../lib/quarters'
+import { yearRead, type Change, type HoverProps, type View } from '../../lib/quarters'
 import { ChangeLine } from './ChangeLine'
-import { YearChart, YearLegend, yearRead } from './YearChart'
+import { YearChart, YearLegend } from './YearChart'
 
 function EquityChange({ change, label }: { change: Change | null; label: string }) {
   if (!change) return null
@@ -49,7 +49,7 @@ export function EquityHero({ view, hover, setHover }: { view: View } & HoverProp
             value={(q) => q.customerEquity}
             axis={gb.axisMillions}
             count={4}
-            strokeWidth={2.5}
+            strokeWidth={2}
             directLabels
             aria={`Line chart of customer equity per quarter, one line per year from ${first.year} to ${current.label}`}
             hover={hover}

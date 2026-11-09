@@ -8,7 +8,7 @@ import { SideNav } from './components/screen/SideNav'
 import { TopBar } from './components/screen/TopBar'
 import { WaterfallSection } from './components/screen/WaterfallSection'
 import { gb } from './lib/format'
-import { defaultIndex, viewFor, type View } from './lib/quarters'
+import { defaultIndex, viewFor, type Hover, type View } from './lib/quarters'
 
 const QUARTER_WORDS = ['', 'quarter', 'two quarters', 'three quarters', 'four quarters']
 
@@ -58,7 +58,7 @@ function answer({ current: c, vsYearLabel }: View): string {
 
 function App() {
   // Gedeelde hover over alle grafieken, zoals in het ontwerp.
-  const [hover, setHover] = useState<number | null>(null)
+  const [hover, setHover] = useState<Hover | null>(null)
   // Gekozen kwartaal (CLAUDE.md, Schermteksten 6); standaard het laatste kwartaal.
   const [selected, setSelected] = useState(defaultIndex)
   const view = viewFor(selected)

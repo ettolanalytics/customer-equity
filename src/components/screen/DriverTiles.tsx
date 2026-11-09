@@ -5,9 +5,9 @@
 import type { ReactNode } from 'react'
 import type { ChartBox } from '../../lib/chart'
 import { gb } from '../../lib/format'
-import { assumptions as a, QUARTER_AXIS, type Change, type HoverProps, type Quarter, type View } from '../../lib/quarters'
+import { assumptions as a, hoveredQuarter, QUARTER_AXIS, yearRead, type Change, type Hover, type HoverProps, type Quarter, type View } from '../../lib/quarters'
 import { ChangeLine } from './ChangeLine'
-import { YearChart, YearLegend, yearRead } from './YearChart'
+import { YearChart, YearLegend } from './YearChart'
 
 const BOX_FACTOR: ChartBox = { W: 600, H: 120, L: 56, R: 8, T: 6, B: 22 }
 const BOX_DRIVER: ChartBox = { W: 300, H: 110, L: 48, R: 8, T: 6, B: 22 }
@@ -27,7 +27,7 @@ type Tile = {
   aria: string
   axis: (step: number) => (v: number) => string
   /** Tekst boven de grafiek bij hover (of altijd, bij churn). */
-  read: (hover: number | null) => string
+  read: (hover: Hover | null) => string
 }
 
 /** Vergelijking van een aantal of bedrag. goodWhenUp: groen bij stijging. */
@@ -44,21 +44,15 @@ function pointChange(diff: number | null, label: string, goodWhenUp: boolean) {
   return <ChangeLine up={up} good={up === goodWhenUp} pill={gb.points(diff)} label={label} />
 }
 
-/**
- * Churn: zonder hover het gekozen kwartaal (werkelijk en verwacht); met hover elk jaar,
- * plus verwacht voor het gekozen jaar ("Exp. —" zonder waarde).
- */
-function churnRead(view: View, hover: number | null): string {
-  const pos = hover ?? view.currentPos
-  const cur = view.years.find((l) => l.role === 0)?.quarters[pos] ?? null
-  const exp = cur ? ` · Exp. ${cur.expectedChurn === null ? '—' : gb.num(cur.expectedChurn)}` : ''
-  if (hover === null) return `${view.current.label} · ${gb.num(view.current.churn)}${exp}`
-  return yearRead(view, pos, (q) => q.churn, gb.num) + exp
+/** Churn: het kwartaal onder de muis, of zonder hover het gekozen kwartaal; met verwacht ("Exp. —" zonder waarde). */
+function churnRead(view: View, hover: Hover | null): string {
+  const q = hoveredQuarter(view, hover) ?? view.current
+  return `${q.label} · ${gb.num(q.churn)} · Exp. ${q.expectedChurn === null ? '—' : gb.num(q.expectedChurn)}`
 }
 
 function tiles(view: View) {
   const { current: c, vsQuarterLabel: vq, vsYearLabel: vy } = view
-  const hoverText = (h: number | null, f: (q: Quarter) => number, fmt: (v: number) => string) => yearRead(view, h, f, fmt)
+  const hoverText = (h: Hover | null, f: (q: Quarter) => number, fmt: (v: number) => string) => yearRead(view, h, f, fmt)
 
   const active: Tile = {
     id: 'active',

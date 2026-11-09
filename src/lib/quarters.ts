@@ -183,5 +183,22 @@ export function viewFor(index: number): View {
   }
 }
 
-/** Hover-positie op de as Q1–Q4 (0–3); gedeeld door alle grafieken, zoals in het ontwerp. */
-export type HoverProps = { hover: number | null; setHover: (i: number | null) => void }
+/**
+ * Hover: positie op de as Q1–Q4 (0–3) en het jaar (rol) van de lijn onder de muis.
+ * Gedeeld door alle grafieken, zoals in het ontwerp: elke grafiek toont hetzelfde kwartaal.
+ */
+export type Hover = { pos: number; role: 0 | 1 | 2 }
+export type HoverProps = { hover: Hover | null; setHover: (h: Hover | null) => void }
+
+/** Kwartaal onder de muis (of null). */
+export function hoveredQuarter(view: View, hover: Hover | null): Quarter | null {
+  if (!hover) return null
+  return view.years.find((l) => l.role === hover.role)?.quarters[hover.pos] ?? null
+}
+
+/** Hovertekst: alleen het punt onder de muis, bijv. "Q2 2025 · 21,073". */
+export function yearRead(view: View, hover: Hover | null, value: (q: Quarter) => number | null, fmt: (v: number) => string): string {
+  const q = hoveredQuarter(view, hover)
+  const v = q ? value(q) : null
+  return q && v !== null ? `${q.label} · ${fmt(v)}` : ''
+}

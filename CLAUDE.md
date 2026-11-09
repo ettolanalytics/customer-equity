@@ -145,9 +145,13 @@ Grafieken (lijngrafiek customer equity en de minigrafieken):
 - Legenda: bij de lijngrafiek, plus jaartallen aan het eind van de lijnen; voor
   de tegels één gedeelde legenda naast "What drives the value". De Churn-tegel
   houdt de gestippelde lijn voor verwachte churn van het gekozen jaar.
-- Hover is gedeeld per kwartaalpositie en toont alle jaren, nieuwste eerst, kort:
-  "Q2 · '26 20,746 · '25 21,073 · '24 21,490". Churn zonder hover:
-  "Q3 2026 · 1,646 · Exp. 1,602".
+- Hover toont alleen het punt onder de muis: het dichtstbijzijnde kwartaal en
+  daar de dichtstbijzijnde lijn (één stip), bijv. "Q2 2025 · 21,073". Gedeeld:
+  alle grafieken tonen hetzelfde kwartaal en jaar. Churn: "Q2 2025 · 1,658 ·
+  Exp. 1,655"; zonder hover het gekozen kwartaal.
+- Lijnen en stippen zijn in alle grafieken even dik/groot op het scherm (in pixels,
+  niet meegeschaald met de grafiek): 1,75 px, gekozen jaar 2,25 px; grote grafiek
+  2 en 2,5 px.
 - Verticale assen: maximaal 3 cijfers per label ("20k", "€250", "€31.9",
   "92.2%", "€5.3M"); in de minigrafieken hooguit 3 ticks.
 

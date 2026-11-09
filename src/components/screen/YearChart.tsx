@@ -1,7 +1,8 @@
 // Lijngrafiek met één lijn per jaar (laatste drie jaar) op de as Q1–Q4.
 // Gedeeld door de grote grafiek en de tegels; gedeelde hover per kwartaalpositie.
 import { lineChart, type ChartBox } from '../../lib/chart'
-import { QUARTER_AXIS, YEAR_COLORS, type HoverProps, type Quarter, type View } from '../../lib/quarters'
+import type { MouseEvent } from 'react'
+import { QUARTER_AXIS, YEAR_COLORS, type Hover, type HoverProps, type Quarter, type View } from '../../lib/quarters'
 
 type Value = (q: Quarter) => number | null
 
@@ -15,24 +16,38 @@ type Props = {
   strokeWidth?: number
   /** Gestippelde lijn voor het huidige jaar (bijv. verwachte churn). */
   dashed?: Value
-  /** Jaartal aan het eind van elke lijn (direct label). */
+  /** Jaartal aan het eind van elke lijn (direct label). Lijndiktes in schermpixels (non-scaling-stroke), dus overal even dik. */
   directLabels?: boolean
 } & HoverProps
 
 const valuesOf = (view: View, f: Value) => view.years.map((l) => l.quarters.map((q) => (q ? f(q) : null)))
 
-export function YearChart({ box, view, value, axis, aria, count = 2, strokeWidth = 2, dashed, directLabels, hover, setHover }: Props) {
+export function YearChart({ box, view, value, axis, aria, count = 2, strokeWidth = 1.75, dashed, directLabels, hover, setHover }: Props) {
   const lines = valuesOf(view, value)
   const current = view.years.find((l) => l.role === 0)
   const dashedValues = dashed && current ? current.quarters.map((q) => (q ? dashed(q) : null)) : null
   const ch = lineChart(box, QUARTER_AXIS, dashedValues ? [...lines, dashedValues] : lines, axis, { count })
-  const pos = hover ?? view.currentPos
+  const pos = hover?.pos ?? view.currentPos
+  const role = hover?.role ?? 0
   const bottom = box.H - box.B
-  // Zonder hover: alleen een stip op het gekozen kwartaal; met hover: op elk jaar met een waarde.
+  // Eén stip: op de lijn onder de muis, of zonder hover op het gekozen kwartaal.
   const dots = view.years
     .map((l, i) => ({ l, v: lines[i][pos] }))
-    .filter(({ l, v }) => v !== null && (hover !== null || l.role === 0))
+    .filter(({ l, v }) => v !== null && l.role === role)
     .map(({ l, v }) => ({ color: YEAR_COLORS[l.role], y: ch.ys(v as number), key: l.year }))
+  // Muis → dichtstbijzijnde kwartaal op de x-as, en daar de dichtstbijzijnde lijn op de y-as.
+  const onMove = (e: MouseEvent<SVGSVGElement>) => {
+    const r = e.currentTarget.getBoundingClientRect()
+    const x = ((e.clientX - r.left) / r.width) * box.W
+    const y = ((e.clientY - r.top) / r.height) * box.H
+    const p = Math.max(0, Math.min(QUARTER_AXIS.length - 1, Math.round((x - box.L) / ch.step)))
+    const near = view.years
+      .map((l, i) => ({ role: l.role, v: lines[i][p] }))
+      .filter((c): c is { role: 0 | 1 | 2; v: number } => c.v !== null)
+      .sort((a, b) => Math.abs(ch.ys(a.v) - y) - Math.abs(ch.ys(b.v) - y))[0]
+    const next: Hover | null = near ? { pos: p, role: near.role } : null
+    if (next?.pos !== hover?.pos || next?.role !== hover?.role) setHover(next)
+  }
   // Direct label: laatste punt met een waarde van elke lijn.
   const ends = view.years.map((l, i) => {
     const last = lines[i].reduce<number>((acc, v, k) => (v !== null ? k : acc), -1)
@@ -46,14 +61,15 @@ export function YearChart({ box, view, value, axis, aria, count = 2, strokeWidth
         width="100%"
         role="img"
         aria-label={aria}
+        onMouseMove={onMove}
         onMouseLeave={() => setHover(null)}
-        style={{ display: 'block', overflow: 'visible' }}
+        style={{ display: 'block', overflow: 'visible', cursor: 'crosshair' }}
       >
         {ch.ticks.map((t) => (
-          <line key={t.label + t.y} x1={box.L} x2={box.W - box.R} y1={t.y} y2={t.y} stroke="#eeede8" strokeWidth="1" />
+          <line key={t.label + t.y} x1={box.L} x2={box.W - box.R} y1={t.y} y2={t.y} stroke="#eeede8" strokeWidth="1" vectorEffect="non-scaling-stroke" />
         ))}
         {dashedValues && (
-          <path d={ch.paths[lines.length]} fill="none" stroke="#8a8984" strokeWidth={strokeWidth} strokeDasharray="5 4" strokeLinejoin="round" strokeLinecap="round" />
+          <path d={ch.paths[lines.length]} fill="none" stroke="#8a8984" strokeWidth={strokeWidth} strokeDasharray="5 4" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
         )}
         {/* Oudste jaar eerst, zodat het gekozen jaar bovenop ligt. */}
         {view.years.map((l, i) => (
@@ -63,25 +79,18 @@ export function YearChart({ box, view, value, axis, aria, count = 2, strokeWidth
             fill="none"
             stroke={YEAR_COLORS[l.role]}
             strokeWidth={l.role === 0 ? strokeWidth + 0.5 : strokeWidth}
+            vectorEffect="non-scaling-stroke"
             strokeLinejoin="round"
             strokeLinecap="round"
           />
         ))}
-        {hover !== null && <line x1={ch.xs(pos)} x2={ch.xs(pos)} y1={box.T} y2={bottom} stroke="#c9c8c1" strokeWidth="1" />}
+        {hover !== null && <line x1={ch.xs(pos)} x2={ch.xs(pos)} y1={box.T} y2={bottom} stroke="#c9c8c1" strokeWidth="1" vectorEffect="non-scaling-stroke" />}
         {dots.map((d) => (
-          <circle key={d.key} cx={ch.xs(pos)} cy={d.y} r="4.5" fill={d.color} stroke="#ffffff" strokeWidth="2" />
-        ))}
-        {QUARTER_AXIS.map((qq, i) => (
-          <rect
-            key={qq}
-            x={ch.xs(i) - ch.step / 2}
-            y={box.T}
-            width={ch.step}
-            height={bottom - box.T}
-            fill="transparent"
-            style={{ cursor: 'crosshair' }}
-            onMouseEnter={() => setHover(i)}
-          />
+          // Stip als rond lijnstukje van lengte 0 met non-scaling-stroke: overal even groot op het scherm.
+          <g key={d.key}>
+            <path d={`M${ch.xs(pos)} ${d.y}h0`} stroke="#ffffff" strokeWidth="12" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+            <path d={`M${ch.xs(pos)} ${d.y}h0`} stroke={d.color} strokeWidth="8" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+          </g>
         ))}
       </svg>
       {ch.ticks.map((t) => (
@@ -126,15 +135,4 @@ export function YearLegend({ view, dashedLabel }: { view: View; dashedLabel?: st
       )}
     </div>
   )
-}
-
-/** Hovertekst, kort: "Q2 · '26 20,746 · '25 21,073 · '24 21,490" (nieuwste jaar eerst). */
-export function yearRead(view: View, pos: number | null, value: Value, fmt: (v: number) => string): string {
-  if (pos === null) return ''
-  const parts = [...view.years]
-    .reverse()
-    .map((l) => ({ year: l.year, v: l.quarters[pos] ? value(l.quarters[pos] as Quarter) : null }))
-    .filter((x) => x.v !== null)
-    .map((x) => `'${String(x.year).slice(2)} ${fmt(x.v as number)}`)
-  return [QUARTER_AXIS[pos], ...parts].join(' · ')
 }
