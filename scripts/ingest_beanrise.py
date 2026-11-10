@@ -523,7 +523,11 @@ def run(args):
                         endpoints[name]["table_rows"], endpoints[name]["status_count"] = in_db, in_api
                         checks.append({"check": f"aantal {name} = /v1/status", "violations": abs(in_db - (in_api or 0))
                                        if in_api is not None else 1})
-                    cur.execute("select pg_database_size(current_database())")
+                    # Omvang na de lading: zonder de tijdelijke tabellen van deze sessie, die bij de
+                    # commit verdwijnen (anders telt de lading twee keer mee).
+                    cur.execute("""select pg_database_size(current_database())
+                                     - coalesce((select sum(pg_total_relation_size(c.oid)) from pg_class c
+                                                 where c.relnamespace = pg_my_temp_schema()), 0)""")
                     db_bytes = cur.fetchone()[0]
                     failed = [c for c in checks if c["violations"]]
                     if failed:
