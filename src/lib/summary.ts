@@ -1,7 +1,31 @@
-// Executive summary: vier zinnen met een vaste opbouw (proefversie v2). Alle getallen komen uit
-// de data van het gekozen kwartaal (jaarweergave); hier worden alleen woorden gekozen.
+// Executive summary (proefversie v2): drie zinnen voor een directeur of investeerder.
+//   1. Resultaat: customer equity nu, verandering t.o.v. een jaar eerder, beter/slechter dan het jaar ervoor.
+//   2. Verklaring: de twee factoren met hun richting, en de grootste reden voor de CLV-verandering.
+//   3. Grootste effect: het onderdeel van de jaarwaterfall met de grootste negatieve waarde.
+// Alle getallen komen uit quarters_v2; hier worden alleen woorden gekozen.
+//
+// Grenzen: maximaal 3 zinnen en 60 woorden; geen oorzaken die niet in de data staan; geen advies.
+// De verandering van customer equity staat als bedrag, niet als percentage: zo botst die nooit
+// met de afgeronde percentages van klanten en CLV (+6% en +7% is geen +14%).
 import { gb } from './format'
 import type { View } from './quarters'
+
+// ---------------------------------------------------------------------------
+// Drempels (vast; elke vergelijking in de tekst hoort bij één van deze)
+// ---------------------------------------------------------------------------
+/** S1 "in line with the year before": de verandering verschilt hoogstens 0,5% van de huidige customer equity. */
+export const IN_LINE_SHARE = 0.005
+/** S1 "about the same as a year ago": de verandering is kleiner dan 0,1% van de huidige customer equity. */
+export const FLAT_SHARE = 0.001
+/** S2 "held steady": klanten of CLV veranderden minder dan 0,05% (afgerond 0,0%). */
+export const STEADY = 0.0005
+/** S3 verlies door churn tegenover de waarde van nieuwe klanten, r = |churn| ÷ new. */
+export const CHURN_WORDS: { min: number; words: string }[] = [
+  { min: 1, words: 'more than' },
+  { min: 0.75, words: 'almost as much as' },
+  { min: 0.5, words: 'more than half of' },
+  { min: 0, words: 'less than half of' },
+]
 
 export type SummaryParts = {
   newCustomers: number
@@ -14,10 +38,10 @@ export type SummaryParts = {
 export type SummaryInput = {
   /** Customer equity van het gekozen kwartaal. */
   ce1: number
-  /** Verandering van customer equity t.o.v. een jaar eerder (fractie). */
-  g: number
+  /** Verandering van customer equity t.o.v. een jaar eerder, in euro (equityVsYearAgo.abs). */
+  change: number
   /** Dezelfde verandering een jaar eerder (opgezocht in kwartaal q−4), of null. */
-  gPrev: number | null
+  changePrev: number | null
   /** Verandering actieve klanten en gemiddelde CLV t.o.v. een jaar eerder (fracties). */
   n: number
   v: number
@@ -26,109 +50,109 @@ export type SummaryInput = {
   val: number
   /** De vijf balken van de jaarwaterfall. */
   parts: SummaryParts
-  /** 10% van |churn| van het jaar (uit de data). */
-  churnLever: number
 }
 
-/** Percentage: hele procenten, bij |x| < 0,5% één decimaal; met of zonder teken. */
-export function pct(x: number, signed: boolean): string {
+/** Welke takken de zinnen namen (voor tests en rapportage). */
+export type Branches = { s1: string; s2: string; r: string; s3: string }
+
+/** Percentage zonder teken: hele procenten, bij |x| < 0,5% één decimaal. */
+export function pct(x: number): string {
   const abs = Math.abs(x) * 100
-  const body = gb.num(abs, abs < 0.5 ? 1 : 0) + '%'
-  return signed ? gb.sign(x) + body : body
+  return gb.num(abs, abs < 0.5 ? 1 : 0) + '%'
 }
 
-/** Bedrag zonder teken: vanaf €1m in miljoenen met één decimaal, daaronder in duizenden. */
+/** Bedrag zonder teken (CLAUDE.md): vanaf €1m in miljoenen met één decimaal, daaronder in duizenden. */
 export const amount = (x: number) => gb.eurShort(Math.abs(x))
+/** Bedrag met teken: "+€1.5m", "−€356k". */
+export const signedAmount = (x: number) => gb.signedThousands(x)
 
 export function summaryInput(view: View): SummaryInput | null {
   const c = view.current
   const y = c.equityVsYearAgo
   const s = c.yearSummary
   const w = c.yearWaterfall
-  if (!y || !s || !w || !c.activeVsYearAgo || !c.avgClvVsYearAgo || w.churnLever === undefined) return null
+  if (!y || !s || !w || !c.activeVsYearAgo || !c.avgClvVsYearAgo) return null
   return {
     ce1: c.customerEquity,
-    g: y.pct,
-    gPrev: view.yearAgo?.equityVsYearAgo?.pct ?? null,
+    change: y.abs,
+    changePrev: view.yearAgo?.equityVsYearAgo?.abs ?? null,
     n: c.activeVsYearAgo.pct,
     v: c.avgClvVsYearAgo.pct,
     mix: s.customerMix,
     val: s.existingCustomerValue,
     parts: w.parts,
-    churnLever: w.churnLever,
   }
 }
 
-/** Welke takken een zin nam (voor tests en rapportage). */
-export type Branches = { s1: string; s2: string; r: string; s3: string; c?: string }
+const words = (sentence: string) => sentence.split(/\s+/).filter(Boolean).length
+export const wordCount = (sentences: string[]) => sentences.reduce((a, s) => a + words(s), 0)
 
 export function executiveSummary(i: SummaryInput): { sentences: string[]; branches: Branches } {
-  // S1: antwoord en vergelijking met een jaar eerder
-  let vPart = ''
-  let s1 = 'geen vorig jaar'
-  if (i.gPrev !== null) {
-    const prev = pct(i.gPrev, true)
-    if (i.g > i.gPrev + 0.005) {
-      vPart = `, a better result than the year before (${prev})`
-      s1 = 'beter'
-    } else if (i.g < i.gPrev - 0.005) {
-      vPart = `, a weaker result than the year before (${prev})`
-      s1 = 'zwakker'
+  // 1. Resultaat
+  const flat = Math.abs(i.change) < FLAT_SHARE * i.ce1
+  const how = flat
+    ? 'about the same as a year ago'
+    : `${amount(i.change)} ${i.change >= 0 ? 'more' : 'less'} than a year ago`
+  let compare = ''
+  let s1 = flat ? 'gelijk aan vorig jaar' : i.change >= 0 ? 'meer' : 'minder'
+  if (i.changePrev !== null) {
+    const diff = i.change - i.changePrev
+    const prev = signedAmount(i.changePrev)
+    if (diff > IN_LINE_SHARE * i.ce1) {
+      compare = `, a better result than the year before (${prev})`
+      s1 += ', beter'
+    } else if (diff < -IN_LINE_SHARE * i.ce1) {
+      compare = `, a weaker result than the year before (${prev})`
+      s1 += ', zwakker'
     } else {
-      vPart = `, in line with the year before (${prev})`
-      s1 = 'gelijk'
+      compare = `, in line with the year before (${prev})`
+      s1 += ', gelijk'
     }
+  } else {
+    s1 += ', geen vorig jaar'
   }
-  const S1 = `Your customer base is worth ${amount(i.ce1)}, ${pct(i.g, false)} ${i.g >= 0 ? 'more' : 'less'} than a year ago${vPart}.`
+  const S1 = `Your customer base is worth ${amount(i.ce1)}, ${how}${compare}.`
 
-  // S2: de twee factoren en de grootste oorzaak binnen de CLV
+  // 2. Verklaring: twee factoren met richting, en de grootste reden voor de CLV-verandering.
+  const dir = (x: number) => (Math.abs(x) < STEADY ? 0 : x > 0 ? 1 : -1)
+  const dn = dir(i.n)
+  const dv = dir(i.v)
+  const customers = dn === 0 ? 'Customers held steady' : `Customers ${dn > 0 ? 'grew' : 'fell'} ${pct(i.n)}`
+  const clv = dv === 0 ? 'average CLV held steady' : `average CLV ${dv > 0 ? 'rose' : 'fell'} ${pct(i.v)}`
+  const join = dn !== 0 && dv !== 0 && dn !== dv ? 'but' : 'and'
+  // De grootste in absolute zin heeft altijd het teken van de CLV-verandering (mix + value).
   const valMain = Math.abs(i.val) >= Math.abs(i.mix)
   const R = valMain
     ? `existing customers became ${i.val >= 0 ? 'more' : 'less'} valuable`
-    : `the customers who joined and left were, on average, worth ${i.mix >= 0 ? 'more' : 'less'} than the ones who stayed`
-  const r = valMain ? (i.val >= 0 ? 'value +' : 'value −') : i.mix >= 0 ? 'mix +' : 'mix −'
-  const n = pct(i.n, true)
-  const v = pct(i.v, true)
-  let S2: string
-  let s2: string
-  if (i.n >= 0 && i.v >= 0) {
-    S2 = `Both drivers helped: you have more customers (${n}) and they are worth more (average CLV ${v}), mainly because ${R}.`
-    s2 = 'beide omhoog'
-  } else if (i.n < 0 && i.v < 0) {
-    S2 = `Both drivers fell: you have fewer customers (${n}) and they are worth less (average CLV ${v}), mainly because ${R}.`
-    s2 = 'beide omlaag'
-  } else if (i.n >= 0) {
-    S2 = `You have more customers (${n}), but they are worth less (average CLV ${v}), mainly because ${R}.`
-    s2 = 'meer klanten, lagere CLV'
-  } else {
-    S2 = `You have fewer customers (${n}), but they are worth more (average CLV ${v}), mainly because ${R}.`
-    s2 = 'minder klanten, hogere CLV'
-  }
+    : `customers who joined and left were worth ${i.mix >= 0 ? 'more' : 'less'} than those who stayed`
+  const S2 =
+    dn === 0 && dv === 0
+      ? 'Customers and average CLV both held steady.'
+      : dv === 0
+        ? `${customers} ${join} ${clv}.`
+        : `${customers} ${join} ${clv}, mainly because ${R}.`
+  const s2 = `${dn > 0 ? 'klanten +' : dn < 0 ? 'klanten −' : 'klanten ='} ${dv > 0 ? 'CLV +' : dv < 0 ? 'CLV −' : 'CLV ='}`
+  const r = dv === 0 ? 'geen reden (CLV gelijk)' : valMain ? (i.val >= 0 ? 'value +' : 'value −') : i.mix >= 0 ? 'mix +' : 'mix −'
 
-  // S3: wat het meest remt (het onderdeel met de grootste negatieve waarde)
-  const begin = i.g >= 0 ? 'What holds growth back is' : 'What pulls value down most is'
+  // 3. Grootste effect (nog niet besloten; werkt zoals voorheen): het onderdeel met de grootste
+  //    negatieve waarde in de jaarwaterfall.
   const keys: (keyof SummaryParts)[] = ['newCustomers', 'reacquiredCustomers', 'churn', 'customerMix', 'existingCustomerValue']
   const worst = keys.map((k) => ({ k, value: i.parts[k] })).reduce((a, b) => (b.value < a.value ? b : a))
   const sentences = [S1, S2]
-  const branches: Branches = { s1, s2, r, s3: 'geen negatief onderdeel' }
+  let s3 = 'geen negatief onderdeel'
   if (worst.value < 0) {
     if (worst.k === 'churn') {
-      const ratio = Math.abs(i.parts.churn) / i.parts.newCustomers
-      const C = ratio >= 1 ? 'more than' : ratio >= 0.75 ? 'almost as much as' : ratio >= 0.5 ? 'more than half of' : 'less than half of'
-      sentences.push(`${begin} churn: the customers you lost were worth ${amount(i.parts.churn)}, ${C} the value of new customers added (${amount(i.parts.newCustomers)}).`)
-      branches.s3 = 'churn'
-      branches.c = C
+      const ratio = i.parts.newCustomers > 0 ? Math.abs(i.parts.churn) / i.parts.newCustomers : Infinity
+      const C = CHURN_WORDS.find((t) => ratio >= t.min)!.words
+      sentences.push(`The customers you lost were worth ${amount(i.parts.churn)}, ${C} the value of new customers added (${amount(i.parts.newCustomers)}).`)
+      s3 = `churn: ${C}`
     } else if (worst.k === 'existingCustomerValue') {
-      sentences.push(`${begin} that existing customers became less valuable (${amount(i.parts.existingCustomerValue)}).`)
-      branches.s3 = 'value effect'
+      sentences.push(`The largest loss came from existing customers becoming less valuable (${amount(i.parts.existingCustomerValue)}).`)
+      s3 = 'value effect'
     } else if (worst.k === 'customerMix') {
-      sentences.push(`${begin} the customer mix: the customers who joined and left were, on average, worth less than the ones who stayed (${amount(i.parts.customerMix)}).`)
-      branches.s3 = 'mix effect'
+      sentences.push(`The largest loss came from customers who joined and left being worth less than those who stayed (${amount(i.parts.customerMix)}).`)
+      s3 = 'mix effect'
     }
-    if (branches.s3 !== 'geen negatief onderdeel') branches.s3 = `${branches.s3} (${i.g >= 0 ? 'holds back' : 'pulls down'})`
   }
-
-  // S4: waar ruimte zit
-  sentences.push(`Every 10% less churn adds about ${amount(i.churnLever)}.`)
-  return { sentences, branches }
+  return { sentences, branches: { s1, s2, r, s3 } }
 }

@@ -44,8 +44,6 @@ export type Waterfall = {
   /** Per klant; in het jaar de som van de vier kwartalen. */
   customerMixPerCustomer: number
   existingCustomerValuePerCustomer: number
-  /** Alleen in de jaarwaterfall: 10% van |churn| (Executive summary S4). */
-  churnLever?: number
 }
 
 /** Rekenvoorbeeld: een nieuwe klant op het meest gekozen abonnement van het kwartaal. */

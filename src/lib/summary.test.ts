@@ -1,129 +1,158 @@
-// Unit tests voor de Executive summary: elke tak van S1–S3, met verzonnen invoer (los van de data).
+// Unit tests voor de Executive summary: elke tak, met verzonnen invoer (los van de data),
+// plus een raster over alle combinaties voor de grenzen (3 zinnen, 60 woorden, geen advies).
 import { describe, expect, it } from 'vitest'
-import { amount, executiveSummary, pct, type SummaryInput } from './summary'
+import { amount, executiveSummary, pct, wordCount, type SummaryInput } from './summary'
 
 const base: SummaryInput = {
   ce1: 14_648_750,
-  g: 0.137,
-  gPrev: 0.08,
+  change: 1_762_004,
+  changePrev: 1_500_000,
   n: 0.063,
   v: 0.069,
   mix: 2.2,
   val: 27.9,
   parts: { newCustomers: 2_527_831, reacquiredCustomers: 299_238, churn: -2_001_137, customerMix: 68_868, existingCustomerValue: 867_204 },
-  churnLever: 200_113.69,
 }
 const run = (over: Partial<SummaryInput> = {}) => executiveSummary({ ...base, ...over })
 const parts = (over: Partial<SummaryInput['parts']>) => ({ ...base.parts, ...over })
 
 describe('notatie', () => {
-  it('percentages: hele procenten met teken, onder 0,5% één decimaal', () => {
-    expect(pct(0.063, true)).toBe('+6%')
-    expect(pct(-0.137, true)).toBe('−14%')
-    expect(pct(0.003, true)).toBe('+0.3%')
-    expect(pct(-0.004, false)).toBe('0.4%')
+  it('percentages zonder teken: hele procenten, onder 0,5% één decimaal', () => {
+    expect(pct(0.063)).toBe('6%')
+    expect(pct(-0.137)).toBe('14%')
+    expect(pct(0.003)).toBe('0.3%')
   })
-  it('bedragen: vanaf €1m in miljoenen, daaronder in duizenden, zonder teken', () => {
+  it('bedragen: vanaf €1m in miljoenen, daaronder in duizenden', () => {
     expect(amount(14_648_750)).toBe('€14.6m')
     expect(amount(-860_400)).toBe('€860k')
   })
 })
 
-describe('S1: antwoord en vergelijking met een jaar eerder', () => {
+describe('1. Resultaat', () => {
   it('meer, beter dan het jaar ervoor', () => {
-    const r = run()
-    expect(r.sentences[0]).toBe('Your customer base is worth €14.6m, 14% more than a year ago, a better result than the year before (+8%).')
-    expect(r.branches.s1).toBe('beter')
+    expect(run().sentences[0]).toBe('Your customer base is worth €14.6m, €1.8m more than a year ago, a better result than the year before (+€1.5m).')
   })
   it('minder, zwakker dan het jaar ervoor', () => {
-    const r = run({ g: -0.05, gPrev: 0.02 })
-    expect(r.sentences[0]).toBe('Your customer base is worth €14.6m, 5% less than a year ago, a weaker result than the year before (+2%).')
-    expect(r.branches.s1).toBe('zwakker')
+    expect(run({ change: -400_000, changePrev: 900_000 }).sentences[0]).toBe(
+      'Your customer base is worth €14.6m, €400k less than a year ago, a weaker result than the year before (+€900k).',
+    )
   })
-  it('gelijk binnen 0,5 procentpunt', () => {
-    const r = run({ g: 0.084, gPrev: 0.08 })
-    expect(r.sentences[0]).toBe('Your customer base is worth €14.6m, 8% more than a year ago, in line with the year before (+8%).')
-    expect(r.branches.s1).toBe('gelijk')
+  it('in line: verschil hoogstens 0,5% van customer equity', () => {
+    expect(run({ change: 1_762_004, changePrev: 1_700_000 }).branches.s1).toBe('meer, gelijk')
+    expect(run({ change: 1_762_004, changePrev: 1_700_000 }).sentences[0]).toContain('in line with the year before (+€1.7m)')
   })
-  it('precies 0,5 procentpunt beter is nog "in line"', () => {
-    expect(run({ g: 0.085, gPrev: 0.08 }).branches.s1).toBe('gelijk')
+  it('precies op de drempel is nog in line', () => {
+    expect(run({ change: 1_000_000, changePrev: 1_000_000 - 0.005 * base.ce1 }).branches.s1).toBe('meer, gelijk')
+  })
+  it('vorig jaar was een daling', () => {
+    expect(run({ change: 300_000, changePrev: -500_000 }).sentences[0]).toContain('a better result than the year before (−€500k)')
   })
   it('zonder kwartaal een jaar eerder: geen vergelijking', () => {
-    const r = run({ gPrev: null })
-    expect(r.sentences[0]).toBe('Your customer base is worth €14.6m, 14% more than a year ago.')
+    expect(run({ changePrev: null }).sentences[0]).toBe('Your customer base is worth €14.6m, €1.8m more than a year ago.')
   })
-  it('g = 0 telt als "more"', () => {
-    expect(run({ g: 0, gPrev: null }).sentences[0]).toBe('Your customer base is worth €14.6m, 0.0% more than a year ago.')
+  it('vrijwel gelijk aan een jaar eerder (kleiner dan 0,1%)', () => {
+    expect(run({ change: 10_000, changePrev: null }).sentences[0]).toBe('Your customer base is worth €14.6m, about the same as a year ago.')
   })
 })
 
-describe('S2: de twee factoren en de grootste oorzaak', () => {
-  it('beide omhoog, value effect positief', () => {
-    expect(run().sentences[1]).toBe(
-      'Both drivers helped: you have more customers (+6%) and they are worth more (average CLV +7%), mainly because existing customers became more valuable.',
-    )
+describe('2. Verklaring', () => {
+  it('beide omhoog, value effect', () => {
+    expect(run().sentences[1]).toBe('Customers grew 6% and average CLV rose 7%, mainly because existing customers became more valuable.')
   })
   it('beide omlaag, value effect negatief', () => {
     expect(run({ n: -0.02, v: -0.03, val: -10, mix: 1 }).sentences[1]).toBe(
-      'Both drivers fell: you have fewer customers (−2%) and they are worth less (average CLV −3%), mainly because existing customers became less valuable.',
+      'Customers fell 2% and average CLV fell 3%, mainly because existing customers became less valuable.',
     )
   })
-  it('meer klanten, lagere CLV, mix effect negatief', () => {
-    expect(run({ n: 0.04, v: -0.01, mix: -3, val: 1 }).sentences[1]).toBe(
-      'You have more customers (+4%), but they are worth less (average CLV −1%), mainly because the customers who joined and left were, on average, worth less than the ones who stayed.',
+  it('meer klanten, lagere CLV: "but"', () => {
+    expect(run({ n: 0.09, v: -0.11, val: -40, mix: 2 }).sentences[1]).toBe(
+      'Customers grew 9% but average CLV fell 11%, mainly because existing customers became less valuable.',
     )
   })
   it('minder klanten, hogere CLV, mix effect positief', () => {
     expect(run({ n: -0.01, v: 0.02, mix: 3, val: -1 }).sentences[1]).toBe(
-      'You have fewer customers (−1%), but they are worth more (average CLV +2%), mainly because the customers who joined and left were, on average, worth more than the ones who stayed.',
+      'Customers fell 1% but average CLV rose 2%, mainly because customers who joined and left were worth more than those who stayed.',
     )
   })
-  it('0 telt als ≥ 0, en bij gelijke grootte wint het value effect', () => {
-    const r = run({ n: 0, v: 0, mix: -5, val: 5 })
-    expect(r.branches.s2).toBe('beide omhoog')
-    expect(r.branches.r).toBe('value +')
+  it('mix effect negatief als grootste reden', () => {
+    expect(run({ n: 0.04, v: -0.01, mix: -3, val: 1 }).sentences[1]).toBe(
+      'Customers grew 4% but average CLV fell 1%, mainly because customers who joined and left were worth less than those who stayed.',
+    )
+  })
+  it('klanten gelijk: "held steady" en "and"', () => {
+    expect(run({ n: 0.0002, v: 0.02 }).sentences[1]).toBe(
+      'Customers held steady and average CLV rose 2%, mainly because existing customers became more valuable.',
+    )
+  })
+  it('CLV gelijk: geen reden', () => {
+    expect(run({ v: -0.0001, mix: 0.01, val: -0.05 }).sentences[1]).toBe('Customers grew 6% and average CLV held steady.')
+  })
+  it('klanten en CLV allebei gelijk', () => {
+    expect(run({ n: 0.0001, v: -0.0002 }).sentences[1]).toBe('Customers and average CLV both held steady.')
+  })
+  it('bij gelijke grootte wint het value effect', () => {
+    expect(run({ mix: -5, val: 5 }).branches.r).toBe('value +')
   })
 })
 
-describe('S3: wat het meest remt', () => {
-  it('churn, meer dan de nieuwe klanten (groei)', () => {
-    const r = run({ parts: parts({ churn: -3_000_000 }) })
-    expect(r.sentences[2]).toBe(
-      'What holds growth back is churn: the customers you lost were worth €3.0m, more than the value of new customers added (€2.5m).',
+describe('3. Grootste effect (zoals voorheen; drempels vast)', () => {
+  it('churn: meer dan de nieuwe klanten (r ≥ 1)', () => {
+    expect(run({ parts: parts({ churn: -3_000_000 }) }).sentences[2]).toBe(
+      'The customers you lost were worth €3.0m, more than the value of new customers added (€2.5m).',
     )
-    expect(r.branches.c).toBe('more than')
   })
   it('churn: bijna even veel (0,75 ≤ r < 1)', () => {
-    expect(run({ parts: parts({ churn: -2_000_000 }) }).branches.c).toBe('almost as much as')
+    expect(run().sentences[2]).toBe('The customers you lost were worth €2.0m, almost as much as the value of new customers added (€2.5m).')
   })
   it('churn: meer dan de helft (0,5 ≤ r < 0,75)', () => {
-    expect(run({ parts: parts({ churn: -1_500_000 }) }).branches.c).toBe('more than half of')
+    expect(run({ parts: parts({ churn: -1_500_000 }) }).branches.s3).toBe('churn: more than half of')
   })
   it('churn: minder dan de helft (r < 0,5)', () => {
-    expect(run({ parts: parts({ churn: -1_000_000 }) }).branches.c).toBe('less than half of')
+    expect(run({ parts: parts({ churn: -1_000_000 }) }).branches.s3).toBe('churn: less than half of')
   })
-  it('churn bij daling: "What pulls value down most is"', () => {
-    expect(run({ g: -0.02, parts: parts({ churn: -900_000 }) }).sentences[2]).toBe(
-      'What pulls value down most is churn: the customers you lost were worth €900k, less than half of the value of new customers added (€2.5m).',
+  it('churn zonder nieuwe klanten telt als "more than"', () => {
+    expect(run({ parts: parts({ newCustomers: 0 }) }).branches.s3).toBe('churn: more than')
+  })
+  it('value effect als grootste verlies', () => {
+    expect(run({ parts: parts({ churn: -500_000, existingCustomerValue: -860_000 }) }).sentences[2]).toBe(
+      'The largest loss came from existing customers becoming less valuable (€860k).',
     )
   })
-  it('value effect', () => {
-    expect(run({ g: -0.02, parts: parts({ churn: -500_000, existingCustomerValue: -860_000 }) }).sentences[2]).toBe(
-      'What pulls value down most is that existing customers became less valuable (€860k).',
-    )
-  })
-  it('mix effect', () => {
+  it('mix effect als grootste verlies', () => {
     expect(run({ parts: parts({ churn: -100_000, customerMix: -1_200_000 }) }).sentences[2]).toBe(
-      'What holds growth back is the customer mix: the customers who joined and left were, on average, worth less than the ones who stayed (€1.2m).',
+      'The largest loss came from customers who joined and left being worth less than those who stayed (€1.2m).',
     )
+  })
+  it('geen negatief onderdeel: geen derde zin', () => {
+    expect(run({ parts: parts({ churn: 0 }) }).sentences).toHaveLength(2)
   })
 })
 
-describe('S4: waar ruimte zit', () => {
-  it('10% minder churn, uit de data', () => {
-    expect(run().sentences.at(-1)).toBe('Every 10% less churn adds about €200k.')
+describe('grenzen over alle combinaties', () => {
+  const signs = [0.063, -0.042, 0.0001]
+  const effects: [number, number][] = [[2, 30], [2, -30], [30, 2], [-30, 2]]
+  const s1: Partial<SummaryInput>[] = [
+    { change: 1_762_004, changePrev: 1_500_000 }, { change: -1_200_000, changePrev: 900_000 },
+    { change: 900_000, changePrev: 880_000 }, { change: 5_000, changePrev: null }, { change: -2_500_000, changePrev: null },
+  ]
+  const s3 = [parts({}), parts({ churn: -100_000, customerMix: -1_234_567 }), parts({ churn: -100_000, existingCustomerValue: -1_234_567 }), parts({ churn: -9_876_543 })]
+  const all: string[][] = []
+  for (const n of signs) for (const v of signs) for (const [mix, val] of effects) for (const a of s1) for (const p of s3) {
+    all.push(run({ n, v, mix, val, ...a, parts: p }).sentences)
+  }
+  it(`${all.length} combinaties: hoogstens 3 zinnen en 60 woorden (langste: ${Math.max(...all.map(wordCount))})`, () => {
+    for (const s of all) {
+      expect(s.length).toBeLessThanOrEqual(3)
+      expect(wordCount(s)).toBeLessThanOrEqual(60)
+    }
   })
-  it('altijd vier zinnen', () => {
-    expect(run().sentences).toHaveLength(4)
+  it('geen advies en geen oorzaken buiten de data', () => {
+    for (const s of all) expect(s.join(' ')).not.toMatch(/\b(should|must|need to|campaign|season|price)\b/i)
+  })
+  it('elke zin eindigt met een punt en bevat geen lege plekken', () => {
+    for (const s of all) for (const x of s) {
+      expect(x).toMatch(/\.$/)
+      expect(x).not.toMatch(/undefined|NaN|null|\{|\}/)
+    }
   })
 })
