@@ -37,3 +37,6 @@ src/data/quarters.json
 
 # Oud screenshot van het KKBox-dashboard: alleen lokaal, nooit in git
 Customer Equity-screenshot.png
+
+# Ontwerpnotities: alleen lokaal, nooit in deze publieke repo
+docs/
