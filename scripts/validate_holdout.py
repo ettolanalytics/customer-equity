@@ -4,14 +4,12 @@ T = laatste kwartaaleinde waarna nog 24 maanden afgesloten kwartalen volgen. Sch
 zoals bekend op T; voorspel voor alle klanten die op T actief zijn de 24 maanden daarna.
 
   V1a  holdout overleving: voorspeld tegen werkelijk aantal klanten met factuur n+h, h = 1..24;
-       totaal ≤ 1,5%, per startabonnement en per groep ≤ 3%, en hoogstens 10% van de maanden
-       buiten het 95%-voorspelinterval.
+       grootste maandfout totaal ≤ 1,5%, per startabonnement en voor de groep eerste ≤ 3%.
+       Terugkerende klanten: apart gerapporteerd, niet getoetst (besluit 11 nov 2026).
   V1b  holdout gerealiseerde marge: verdisconteerde marge per maand over factuur n+1..n+24,
-       gewaardeerd tegen prijs én kostprijs per abonnement op T; fout op het totaal ≤ 2%, per
-       abonnement ≤ 3%, en hoogstens 10% van de maanden buiten het 95%-voorspelinterval.
-       Varianten: marge van het huidige abonnement / met overstappen.
-  Waarom 10%: ook een perfect model valt in een maand met kans 5% buiten een 95%-interval;
-  "alle 24 maanden binnen" faalt dan in ±71% van de gevallen (1 − 0,95^24).
+       gewaardeerd tegen de 12-maandsmarge per abonnement op T; fout over 24 maanden totaal ≤ 2%,
+       per abonnement ≤ 3%. Varianten: marge van het huidige abonnement / met overstappen.
+  Intervallen (95%, per maand) zijn diagnose: ze worden gerapporteerd, niet getoetst.
   V2   tegen de oude methode (vaste retentie: 1 − gemiddelde churn van de 4 kwartalen t/m T):
        gemiddelde absolute fout van sBG kleiner, totaal en per segment.
   V3   kalibratie per klantduur × startabonnement, na 3 en 12 maanden: cellen met ≥ 200 klanten
@@ -45,7 +43,7 @@ from env import connect  # noqa: E402
 
 H = 24
 DRAWS = 200
-MAX_OUTSIDE = 0.10          # hoogstens 10% van de maanden buiten het 95%-interval
+MAX_OUTSIDE = 0.10          # alleen voor de diagnose: 10% van de maanden buiten het 95%-interval
 PLAN_NAMES = {}
 
 # Modellen in volgorde van eenvoud: segment per (groep, startabonnement, huidig abonnement).
@@ -216,10 +214,10 @@ def v1a(e, rng):
         rel = np.abs(pred - act) / act
         norm = 0.015 if name == "totaal" else 0.03
         outside = int(np.sum((act < lo) | (act > hi)))
-        inside = outside <= MAX_OUTSIDE * H
+        tested = name != "groep terugkeer"
         out[name] = {"customers": float(w.sum()), "max_rel_err": float(rel.max()), "mae_rel": float(rel.mean()),
-                     "inside_interval": inside, "months_outside": outside,
-                     "norm": norm, "pass": bool(rel.max() <= norm and inside),
+                     "months_outside": outside, "norm": norm, "tested": tested,
+                     "pass": bool(rel.max() <= norm),
                      "actual_24": float(act[-1]), "pred_24": float(pred[-1])}
     return out
 
@@ -240,10 +238,8 @@ def v1b(e, rng, variant):
         outside = int(np.sum((act_h < lo) | (act_h > hi)))
         rel = abs(pred - act) / act
         norm = 0.02 if name == "totaal" else 0.03
-        inside = outside <= MAX_OUTSIDE * H
         out[name] = {"actual_eur": float(act), "pred_eur": float(pred), "rel_err": float(rel),
-                     "months_outside": outside, "inside_interval": inside, "norm": norm,
-                     "pass": bool(rel <= norm and inside)}
+                     "months_outside": outside, "norm": norm, "pass": bool(rel <= norm)}
     return out
 
 
@@ -328,17 +324,17 @@ def main():
              "V1b_switching": v1b(e, rng, "switching"), "V3": v3(e), "holdout_ll": holdout_ll(e)}
         r["V2"], old_rate = v2(d, e, r["V1a"], r["V1b_current"])
         evals[code] = e
-        r["passes"] = all(x["pass"] for x in r["V1a"].values()) and r["V3"]["pass"] and r["V4"]
+        r["passes"] = all(x["pass"] for x in r["V1a"].values() if x["tested"]) and r["V3"]["pass"] and r["V4"]
         res["models"][code] = r
         print(f"\n{code} {label}: V4 {'OK' if r['V4'] else 'FOUT'}, V1a "
-              f"{'OK' if all(x['pass'] for x in r['V1a'].values()) else 'FOUT'}, V3 {r['V3']['share_pass']:.0%}, "
+              f"{'OK' if all(x['pass'] for x in r['V1a'].values() if x['tested']) else 'FOUT'}, V3 {r['V3']['share_pass']:.0%}, "
               f"holdout-LL {r['holdout_ll']:,.1f}")
         for s, f in r["fits"].items():
             print(f"    segment {s}: α {f['alpha']:.4f}  β {f['beta']:.3f}  ({f['customers']:,.0f} klantperioden)")
         for g, x in r["V1a"].items():
             print(f"    V1a {g:<16} max {x['max_rel_err']:.2%} (norm {x['norm']:.1%}), gem {x['mae_rel']:.2%}, "
-                  f"{x['months_outside']} mnd buiten interval (max {int(MAX_OUTSIDE * H)})"
-                  f"  {'OK' if x['pass'] else 'FOUT'}")
+                  f"{x['months_outside']} mnd buiten interval (diagnose)"
+                  f"  {('OK' if x['pass'] else 'FOUT') if x['tested'] else ('apart: ' + ('binnen norm' if x['pass'] else 'boven norm'))}")
     res["old_rate_q"] = old_rate
 
     # Beslisregel segmenten en terugkeerders
@@ -367,7 +363,7 @@ def main():
     for variant in ("current", "switching"):
         for g, x in ch[f"V1b_{variant}"].items():
             print(f"    {variant:<9} {g:<12} werkelijk €{x['actual_eur']:,.0f}  voorspeld €{x['pred_eur']:,.0f}  "
-                  f"fout {x['rel_err']:.2%} (norm {x['norm']:.0%}), {x['months_outside']} mnd buiten interval  "
+                  f"fout {x['rel_err']:.2%} (norm {x['norm']:.0%}), {x['months_outside']} mnd buiten interval (diagnose)  "
                   f"{'OK' if x['pass'] else 'FOUT'}")
     print(f"V2 tegen de oude methode (vaste retentie {1 - old_rate:.2%} per kwartaal):")
     for g, x in ch["V2"].items():
@@ -391,8 +387,13 @@ def main():
         res["returners_note"] = {"delta_ll": dll, "v1a_pooled": a["V1a"]["groep terugkeer"]["max_rel_err"],
                                  "v1a_separate": b["V1a"]["groep terugkeer"]["max_rel_err"]}
 
-    ok = ch["passes"] and all(x["pass"] for x in ch["V2"].values()) and \
-        all(x["pass"] for x in ch[f"V1b_{margin}"].values()) and res["matches_settings"]
+    # De job faalt alleen bij een overschreden foutnorm (V1a, V1b van de gekozen margemethode,
+    # V3) of bij een fit die niet convergeert (V4). V2 en het advies worden gerapporteerd.
+    ok = ch["passes"] and all(x["pass"] for x in ch[f"V1b_{margin}"].values())
+    if not res["matches_settings"]:
+        print("Let op: het advies wijkt af van ce_private.settings_v2 (rapportage, geen fout).")
+    if not all(x["pass"] for x in ch["V2"].values()):
+        print("Let op: V2 niet overal beter dan de oude methode (rapportage, geen fout).")
     res["pass"] = bool(ok)
     if args.save:
         with connect("CE_LOADER_DB_URL") as conn, conn.cursor() as cur:

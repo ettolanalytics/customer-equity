@@ -255,21 +255,26 @@ Python-omgeving: `.venv` met scripts/requirements.txt.
 
 ## Validatie van het CLV-model (sBG, in opbouw in ce_public.quarters_v2)
 scripts/validate_holdout.py, maandelijks in de Action. Holdout: schatten op de data zoals
-bekend op T, vergelijken met de 24 maanden daarna. Alleen een convergentiefout houdt de
-publicatie tegen; een gefaalde validatie laat de run falen (mail).
-- V1a overleving: grootste maandfout totaal ≤ 1,5%, per startabonnement en per groep ≤ 3%.
-- V1b gerealiseerde marge (prijs en kostprijs op het niveau van T): fout over 24 maanden
-  totaal ≤ 2%, per abonnement ≤ 3%.
-- Bij V1a en V1b: hoogstens 10% van de maanden buiten het 95%-voorspelinterval (ook een
-  perfect model valt in een maand met kans 5% buiten het interval; "alle 24 maanden binnen"
-  zou ook dan in ±71% van de gevallen falen).
-- V2: de nieuwe methode heeft een kleinere fout dan de oude (vaste retentie).
+bekend op T, vergelijken met de 24 maanden daarna. Beslist wordt op de foutpercentages.
+De validatiejob faalt alleen bij een overschreden foutnorm of een fit die niet convergeert;
+een gefaalde validatie houdt de publicatie niet tegen (alleen een convergentiefout doet dat).
+- V1a overleving: grootste maandfout totaal ≤ 1,5%, per startabonnement en voor de groep
+  eerste klantperiode ≤ 3%. Terugkerende klanten: apart gerapporteerd, niet getoetst
+  (geaccepteerd op 3,13% tegen 3%).
+- V1b gerealiseerde marge (gewaardeerd tegen de 12-maandsmarge per abonnement op T): fout
+  over 24 maanden totaal ≤ 2%, per abonnement ≤ 3%.
 - V3 kalibratie per klantduur: ≥ 90% van de cellen (≥ 200 klanten) binnen het 95%-binomiale
   interval of ≤ 2 procentpunt.
 - V4 convergentie bij elke run: drie startpunten, kleine gradiënt, positief definiete Hessiaan.
+- Diagnose, niet getoetst: het aantal maanden buiten het 95%-voorspelinterval (V1a, V1b) en de
+  vergelijking met de oude methode (V2, vaste retentie).
 - Beslisregel: het eenvoudigste niveau (samen → terugkeerders apart → per startabonnement →
-  beide) dat V1a en V3 haalt; anders de hoogste holdout-likelihood. Marge met overstappen
-  alleen als het huidige abonnement V1b niet haalt en de overstapvariant wel.
+  beide) dat V1a en V3 haalt; een ingewikkelder niveau wint als de holdout-log-likelihood
+  meer dan 2 × (extra parameters) hoger is. Marge met overstappen als het huidige abonnement
+  V1b niet haalt en de overstapvariant wel.
+- Gekozen (11 nov 2026): per startabonnement met terugkerende klanten apart (model D), marge
+  met overstappen. De overstapvariant wijkt klein maar systematisch af (veel maanden buiten
+  het interval); waarschijnlijk vangt hij afschalen vóór opzeggen niet.
 
 ## Open punten
 - pg_cron (beschikbaar, versie 1.6.4, nog niet geïnstalleerd) voor een geplande

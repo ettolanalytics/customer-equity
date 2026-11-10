@@ -32,6 +32,7 @@ Netlify      statische site
 | `20261110160000_ce_v2_deterministic.sql` | Geen parallelle optellingen bij verversen en publiceren (vaste volgorde) |
 | `20261110170000_ce_v2_tolerance.sql` | `jsonb_close()`: controle "afgesloten kwartaal ongewijzigd" met een tolerantie van één cent |
 | `20261110180000_ce_v2_mix_existing.sql` | Marge per factuur op de peildatum; gemiddelde CLV = Customer mix + Existing customer value; waterfall met vijf balken; nieuwe JSON en controles (ontwerp v3.4) |
+| `20261111090000_ce_v2_switching_12m.sql` | Marge per abonnement weer als 12-maandsgemiddelde; margemethode met overstappen: `margin_paths()`, `mv_bz_margin_path`, waardetabel `mv_bz_vgrid`; CLV = respijtfactor × waarde |
 
 Uitvoeren: `.venv/bin/python scripts/apply_migrations.py` (alle bestanden in één transactie; stopt als `ce_private` al bestaat). Een nieuwe migratie op een bestaand schema: `.venv/bin/python scripts/apply_migrations.py supabase/migrations/<bestand>.sql` (die migratie plus de beveiligingsasserties, in één transactie).
 
