@@ -43,7 +43,7 @@ export function SideNav() {
             <circle cx="16" cy="7" r="2" />
             <circle cx="10" cy="17" r="2" />
           </svg>
-          How we calculate
+          Model and assumptions
         </a>
       </nav>
     </aside>

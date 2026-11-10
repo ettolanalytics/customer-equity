@@ -36,7 +36,7 @@ function answer({ current: c, yearAgo }: View): string {
   const existingMain = Math.abs(s.existingCustomerValue) >= Math.abs(s.customerMix)
   const clvReason = existingMain
     ? `existing customers became ${s.existingCustomerValue >= 0 ? 'more' : 'less'} valuable (value effect)`
-    : `of the customer mix: the customers who joined and left were worth ${s.customerMix >= 0 ? 'more' : 'less'} than the average (mix effect)`
+    : `the customers who joined and left were, on average, worth ${s.customerMix >= 0 ? 'more' : 'less'} than the ones who stayed (mix effect)`
 
   return [
     `Customer equity ${equityUp ? 'grew' : 'fell'} ${gb.eurShort(y.abs)} (${gb.signedPct(y.pct)}) vs ${yearAgo.label}, because ${why}.`,

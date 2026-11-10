@@ -1,64 +1,70 @@
-// "How we calculate": vijf stappen en het rekenvoorbeeld (CLAUDE.md, Schermteksten 4 en 5; ontwerp v3.4 §9).
+// "Model and assumptions" (proefversie v2): het model in het kort en de aannames als tabel.
+// De definities staan in de tooltips. Alle getallen komen uit de data (quarters_v2, publication_v2).
 import { gb } from '../../lib/format'
-import { assumptions as a, type Quarter, type View } from '../../lib/quarters'
+import { assumptions as a, type View } from '../../lib/quarters'
 
 /** Percentage zonder decimalen: 0.1 → "10%" */
 const pct0 = (fraction: number) => gb.num(fraction * 100) + '%'
 
-const steps = (current: Quarter) => {
-  const ex = current.clvExample
-  const years = gb.num(a.horizonMonths / 12)
-  const perPlan = current.model.some((m) => m.segment > 0)
-  const group = perPlan ? 'per plan the customer started on (returning customers separately),' : 'on all customers together,'
-  return [
-    {
-      title: 'CLV',
-      text: `The value of an active customer: the contribution margin (price minus the cost of each delivery, excluding VAT, averaged over the last 12 months per plan, including expected up- and downgrades) we expect from them over the next ${years} years (${gb.num(a.horizonMonths)} monthly invoices), discounted to today at ${pct0(a.discountRateYear)} per year. It counts only what is left to earn from current customers, not acquisition costs, and nothing after ${years} years. How long a customer is expected to stay comes from a shifted-beta-geometric model: every customer has their own chance of cancelling, customers who have stayed longer are more likely to stay, and the model is fitted ${group} on all subscriptions up to the quarter.`,
-      example:
-        `A new ${gb.plan(ex.sizeGrams)} customer renews next month with a ${gb.pct(ex.nextInvoiceChance)} chance and is expected to pay ` +
-        `${gb.num(ex.expectedInvoices, 1)} more invoices within ${years} years (discounted; ${gb.num(ex.undiscountedInvoices, 1)} undiscounted). ` +
-        `At ${gb.clv(ex.marginPerInvoice)} margin per invoice, plus expected plan changes, that is a CLV of ${gb.clv(ex.value)}.`,
-    },
-    {
-      title: 'Customer equity',
-      text: `The sum of the CLV of all active customers: active customers × average CLV. An active customer is a customer with a running subscription, or within ${a.graceDays} days after it expired. Customers in those ${a.graceDays} days count at the share that still renews (${gb.pct(current.lateRenewalFactor)}).`,
-    },
-    {
-      title: 'Why average CLV changes',
-      text: `Mix effect: the customers who joined and left had a different value than the average. Value effect: existing customers became more or less valuable. Together they are the change in average CLV. Average CLV = ${gb.num(current.expectedInvoices, 1)} expected invoices × ${gb.clv(current.marginPerFutureInvoice)} margin per future invoice.`,
-    },
-    {
-      title: 'Change per quarter',
-      text: 'New, reacquired and churned customers are valued at the average CLV at the start of the period; the mix effect and the value effect are multiplied by the number of customers at the end. The year view adds up the four quarters.',
-    },
-    {
-      title: 'Acquisition costs',
-      text: 'Acquisition costs are not included. Amounts exclude VAT.',
-    },
-  ] as { title: string; text: string; example?: string }[]
-}
-
 export function MethodSection({ view }: { view: View }) {
+  const c = view.current
+  const ex = c.clvExample
+  const years = gb.num(a.horizonMonths / 12)
+  const perPlan = c.model.some((m) => m.segment > 0)
+  const returning = c.model.some((m) => m.segment === 0)
+  const fitted = perPlan
+    ? `Fitted per starting plan${returning ? ', with returning customers separately,' : ''} on all subscriptions up to the quarter.`
+    : `Fitted on all customers together${returning ? ', with returning customers separately,' : ''} on all subscriptions up to the quarter.`
+
+  const model = [
+    'How long customers stay: shifted-beta-geometric model. Every customer has their own chance of cancelling; customers who have stayed longer are more likely to stay.',
+    fitted,
+    'Checked every month against what actually happened next.',
+  ]
+  const example =
+    `A new ${gb.plan(ex.sizeGrams)} customer renews next month with a ${gb.pct(ex.nextInvoiceChance)} chance and is expected to pay ` +
+    `${gb.num(ex.expectedInvoices, 1)} more invoices within ${years} years (discounted). ` +
+    `At ${gb.clv(ex.marginPerInvoice)} margin per invoice, plus expected plan changes, that is a CLV of ${gb.clv(ex.value)}.`
+  const rows: [string, string][] = [
+    ['Horizon', `${years} years (${gb.num(a.horizonMonths)} monthly invoices); nothing after ${years} years counts.`],
+    ['Discount rate', `${pct0(a.discountRateYear)} per year.`],
+    ['Margin', 'Price minus the cost of each delivery, excluding VAT; averaged over the last 12 months per plan; including expected up- and downgrades.'],
+    ['Active customer', `Running subscription, or within ${a.graceDays} days after it expired.`],
+    [`Customers within those ${a.graceDays} days`, `Count at the share that still renews (${gb.pct(c.lateRenewalFactor)}).`],
+    ['Acquisition costs', 'Not included.'],
+    ['Change per period', 'New, reacquired and churned customers at the average CLV at the start; mix and value effect × customers at the end; the year adds up four quarters.'],
+  ]
+
   return (
-    <section id="method" className="card section" aria-label="How we calculate">
-      <h2 className="section-title" style={{ marginBottom: 6 }}>How we calculate</h2>
-      <ol className="method">
-        {steps(view.current).map((s, i) => (
-          <li key={s.title}>
-            <span className="method-n">{i + 1}</span>
-            <div style={{ minWidth: 0, flex: '1 1 auto' }}>
-              <p className="method-title">{s.title}</p>
-              <p className="method-text">{s.text}</p>
-              {s.example && (
-                <p className="method-ex">
-                  <span style={{ fontWeight: 600 }}>Worked example: </span>
-                  {s.example}
-                </p>
-              )}
-            </div>
-          </li>
-        ))}
-      </ol>
+    <section id="method" className="card section" aria-label="Model and assumptions">
+      <h2 className="section-title" style={{ marginBottom: 6 }}>Model and assumptions</h2>
+      <div className="ma">
+        <div className="ma-block">
+          <p className="method-title">Model</p>
+          <ul className="ma-list">
+            {model.map((m) => (
+              <li key={m}>{m}</li>
+            ))}
+          </ul>
+          <p className="method-ex">
+            <span style={{ fontWeight: 600 }}>Example: </span>
+            {example}
+          </p>
+        </div>
+        <div className="ma-block">
+          <p className="method-title">Assumptions</p>
+          <table className="ma-table">
+            <tbody>
+              {rows.map(([k, v]) => (
+                <tr key={k}>
+                  <th scope="row">{k}</th>
+                  <td>{v}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </section>
   )
 }

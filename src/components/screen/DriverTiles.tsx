@@ -63,7 +63,7 @@ function tiles(view: View) {
   const clv: Tile = {
     id: 'clv',
     label: 'CLV',
-    tip: 'Average value of an active customer: the contribution margin we expect from them over the next five years, discounted to today.',
+    tip: `Average value of an active customer: the contribution margin we expect from them over the next ${gb.num(a.horizonMonths / 12)} years, discounted to today at ${gb.num(a.discountRateYear * 100)}% per year.`,
     value: gb.clv(c.avgClv),
     vsQuarter: countChange(c.avgClvVsPrevQuarter, vq, gb.signedClv),
     vsYear: countChange(c.avgClvVsYearAgo, vy, gb.signedClv),
