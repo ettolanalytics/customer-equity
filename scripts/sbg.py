@@ -51,15 +51,30 @@ def fit(n, churned, w):
                        options={"ftol": 1e-15, "gtol": 1e-10, "maxiter": 2000})
         runs.append(res)
     best = min(runs, key=lambda r: r.fun)
-    x = best.x
+
+    def hessian(x, eps=1e-5):
+        h = np.zeros((2, 2))
+        for i in range(2):
+            d = np.zeros(2)
+            d[i] = eps
+            h[:, i] = (_ll_grad(x + d, n, churned, w)[1] - _ll_grad(x - d, n, churned, w)[1]) / (2 * eps)
+        return (h + h.T) / 2
+
+    # Newton-stappen vanaf het beste L-BFGS-punt: L-BFGS stopt op het vlakke optimum binnen zijn
+    # tolerantie (verschillen tot ~1e-6 tussen machines); Newton brengt het optimum op ~1e-12,
+    # zodat dezelfde data op elke machine dezelfde α en β geeft.
+    x = best.x.copy()
+    for _ in range(20):
+        g = _ll_grad(x, n, churned, w)[1]
+        h = hessian(x)
+        if not np.all(np.linalg.eigvalsh(-h) > 0):
+            break
+        step = np.linalg.solve(h, g)
+        x = x - step
+        if np.max(np.abs(step)) < 1e-13:
+            break
     ll, g = _ll_grad(x, n, churned, w)
-    eps = 1e-5
-    hess = np.zeros((2, 2))
-    for i in range(2):
-        d = np.zeros(2)
-        d[i] = eps
-        hess[:, i] = (_ll_grad(x + d, n, churned, w)[1] - _ll_grad(x - d, n, churned, w)[1]) / (2 * eps)
-    hess = (hess + hess.T) / 2
+    hess = hessian(x)
     eig = np.linalg.eigvalsh(-hess)
     pd = bool(np.all(eig > 0))
     cov = np.linalg.inv(-hess) if pd else np.full((2, 2), np.nan)
