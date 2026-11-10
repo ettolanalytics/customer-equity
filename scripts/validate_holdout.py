@@ -4,10 +4,14 @@ T = laatste kwartaaleinde waarna nog 24 maanden afgesloten kwartalen volgen. Sch
 zoals bekend op T; voorspel voor alle klanten die op T actief zijn de 24 maanden daarna.
 
   V1a  holdout overleving: voorspeld tegen werkelijk aantal klanten met factuur n+h, h = 1..24;
-       totaal ≤ 1,5%, per startabonnement en per groep ≤ 3%, en binnen het 95%-voorspelinterval.
-  V1b  holdout gerealiseerde marge: verdisconteerde marge over factuur n+1..n+24, gewaardeerd tegen
-       de marge per abonnement op T (prijs én kostprijs van T); totaal ≤ 2%, per abonnement ≤ 3%,
-       en binnen het interval. Varianten: marge van het huidige abonnement / met overstappen.
+       totaal ≤ 1,5%, per startabonnement en per groep ≤ 3%, en hoogstens 10% van de maanden
+       buiten het 95%-voorspelinterval.
+  V1b  holdout gerealiseerde marge: verdisconteerde marge per maand over factuur n+1..n+24,
+       gewaardeerd tegen prijs én kostprijs per abonnement op T; fout op het totaal ≤ 2%, per
+       abonnement ≤ 3%, en hoogstens 10% van de maanden buiten het 95%-voorspelinterval.
+       Varianten: marge van het huidige abonnement / met overstappen.
+  Waarom 10%: ook een perfect model valt in een maand met kans 5% buiten een 95%-interval;
+  "alle 24 maanden binnen" faalt dan in ±71% van de gevallen (1 − 0,95^24).
   V2   tegen de oude methode (vaste retentie: 1 − gemiddelde churn van de 4 kwartalen t/m T):
        gemiddelde absolute fout van sBG kleiner, totaal en per segment.
   V3   kalibratie per klantduur × startabonnement, na 3 en 12 maanden: cellen met ≥ 200 klanten
@@ -41,6 +45,7 @@ from env import connect  # noqa: E402
 
 H = 24
 DRAWS = 200
+MAX_OUTSIDE = 0.10          # hoogstens 10% van de maanden buiten het 95%-interval
 PLAN_NAMES = {}
 
 # Modellen in volgorde van eenvoud: segment per (groep, startabonnement, huidig abonnement).
@@ -100,13 +105,27 @@ def load(cur):
         join ce_private.mv_bz_spells sp using (customer_id, spell_no)
         left join fut f using (customer_id, spell_no)
         group by 1, 2, 3, 4, 5, 6, 7""", {"T": T, "d": delta, "H": H, "asof": as_of}), dtype=float)
+    # Gerealiseerde marge per maand h (factuur n+h), per cohortgroep, tegen de marge op T.
+    real_h = q(cur, """
+        with st as (select * from ce_private.mv_bz_state where qe = %(T)s),
+             m  as (select plan_id, margin_eur from ce_private.mv_bz_plan_money where qe = %(T)s)
+        select st.returning::int + 1, st.start_plan, st.plan_id, st.n, st.paid_through::int,
+               least(sp.n_total - st.n, %(H)s), (sp.spell_end <= %(asof)s)::int, v.k - st.n,
+               sum(power(%(d)s, (v.k - st.n)::double precision) * m.margin_eur)
+        from st
+        join ce_private.mv_bz_spells sp using (customer_id, spell_no)
+        join ce_private.v_bz_paid v
+          on v.customer_id = st.customer_id and v.spell_no = st.spell_no
+         and v.k > st.n and v.k <= st.n + %(H)s
+        join m on m.plan_id = v.plan_id
+        group by 1, 2, 3, 4, 5, 6, 7, 8""", {"T": T, "d": delta, "H": H, "asof": as_of})
     # Oude methode: churn% (churn ÷ actief begin) van de 4 kwartalen t/m T.
     rates = q(cur, """select sum(customers) filter (where flow = 'L')::double precision
                              / sum(customers) filter (where flow in ('S', 'L'))
                       from ce_private.mv_bz_pairs where qe <= %(T)s and qe > (%(T)s - interval '12 months')
                       group by qe""", {"T": T})
     return {"T": T, "as_of": as_of, "last_qe": last_qe, "delta": delta, "settings": s, "fit": fit_rows,
-            "margins": margins, "switch": switch, "g": g, "cohort": cohort,
+            "margins": margins, "switch": switch, "g": g, "cohort": cohort, "real_h": real_h,
             "old_rate_q": float(np.mean([r[0] for r in rates]))}
 
 
@@ -141,6 +160,12 @@ def evaluate(d, fn, fits, rng):
     known = ~((c[:, 6] == 0) & (c[:, 5] < H))          # uitkomst bekend (afgelopen of 24 extra facturen)
     c = c[known]
     grp, sp, cp, n, pt, j, ended, w, real = c.T
+    pos = {tuple(int(x) for x in row[:7]): i for i, row in enumerate(c)}
+    real_h = np.zeros((len(c), H))
+    for row in d["real_h"]:
+        i = pos.get(tuple(int(x) for x in row[:7]))
+        if i is not None:
+            real_h[i, int(row[7]) - 1] += row[8]
     keys = np.array([fn(int(a), int(b), int(e)) for a, b, e in zip(grp, sp, cp)])
     gfac = np.where(pt == 1, 1.0, d["g"])
     h = np.arange(1, H + 1)
@@ -175,7 +200,7 @@ def evaluate(d, fn, fits, rng):
     for p in sorted(set(cp.astype(int))):
         pgroups[f"huidig {PLAN_NAMES[p]}"] = cp == p
     return {"c": c, "S": S, "draws": draws, "w": w, "j": j, "ended": ended, "n": n, "sp": sp, "cp": cp,
-            "pt": pt, "real": real, "disc": disc, "mcur": mcur, "msw": msw, "groups": groups,
+            "pt": pt, "real": real, "real_h": real_h, "disc": disc, "mcur": mcur, "msw": msw, "groups": groups,
             "pgroups": pgroups, "keys": keys, "point": point, "h": h}
 
 
@@ -190,39 +215,40 @@ def v1a(e, rng):
         lo, hi = np.percentile(sim, [2.5, 97.5], axis=0)
         rel = np.abs(pred - act) / act
         norm = 0.015 if name == "totaal" else 0.03
-        inside = bool(np.all((act >= lo) & (act <= hi)))
+        outside = int(np.sum((act < lo) | (act > hi)))
+        inside = outside <= MAX_OUTSIDE * H
         out[name] = {"customers": float(w.sum()), "max_rel_err": float(rel.max()), "mae_rel": float(rel.mean()),
-                     "inside_interval": inside, "months_outside": int(np.sum((act < lo) | (act > hi))),
+                     "inside_interval": inside, "months_outside": outside,
                      "norm": norm, "pass": bool(rel.max() <= norm and inside),
                      "actual_24": float(act[-1]), "pred_24": float(pred[-1])}
     return out
 
 
 def v1b(e, rng, variant):
+    """Gerealiseerde marge per maand tegen de voorspelling; fout op het totaal, interval per maand."""
     out = {}
     for name, sel in e["pgroups"].items():
         w, S = e["w"][sel], e["S"][sel]
         M = e["mcur"][sel][:, None] * np.ones(H) if variant == "current" else e["msw"][sel]
-        vals = S * M * e["disc"]
-        pred = (w[:, None] * vals).sum()
-        act = e["real"][sel].sum()
-        # Variantie per klant: Σ_t Σ_s δ^(t+s) M_t M_s (p_max(t,s) − p_t p_s).
-        DM = M * e["disc"]
-        pmax = np.minimum(S[:, :, None], S[:, None, :])               # p van het latere moment
-        cov = pmax - S[:, :, None] * S[:, None, :]
-        var = (w * np.einsum("rt,rs,rts->r", DM, DM, cov)).sum()
-        sim = (e["draws"][:, sel] * (M * e["disc"])[None] * w[None, :, None]).sum((1, 2))
-        sim = sim + rng.normal(0, np.sqrt(var), DRAWS)
-        lo, hi = np.percentile(sim, [2.5, 97.5])
+        DM = M * e["disc"]                                            # rijen × H
+        pred_h = (w[:, None] * S * DM).sum(0)
+        act_h = e["real_h"][sel].sum(0)
+        pred, act = pred_h.sum(), act_h.sum()
+        var_h = (w[:, None] * DM ** 2 * S * (1 - S)).sum(0)
+        sim = (e["draws"][:, sel] * DM[None] * w[None, :, None]).sum(1) + rng.normal(0, np.sqrt(var_h), (DRAWS, H))
+        lo, hi = np.percentile(sim, [2.5, 97.5], axis=0)
+        outside = int(np.sum((act_h < lo) | (act_h > hi)))
         rel = abs(pred - act) / act
         norm = 0.02 if name == "totaal" else 0.03
-        inside = bool(lo <= act <= hi)
+        inside = outside <= MAX_OUTSIDE * H
         out[name] = {"actual_eur": float(act), "pred_eur": float(pred), "rel_err": float(rel),
-                     "inside_interval": inside, "norm": norm, "pass": bool(rel <= norm and inside)}
+                     "months_outside": outside, "inside_interval": inside, "norm": norm,
+                     "pass": bool(rel <= norm and inside)}
     return out
 
 
 def v2(d, e, sbg_v1a, sbg_v1b):
+    """sbg_v1b: de V1b-uitkomsten van de gekozen margemethode."""
     r_m = (1 - d["old_rate_q"]) ** (1 / 3)
     surv_old = r_m ** e["h"]
     out = {}
@@ -290,6 +316,7 @@ def main():
     print(f"Holdout: schatten t/m {d['T']}, voorspellen t/m {d['T'].replace(year=d['T'].year + 2)} "
           f"(as_of {d['as_of']}); cohort {int(d['cohort'][:, 7].sum()):,} klanten; g op T {d['g']:.3f}")
     res = {"T": d["T"].isoformat(), "as_of": d["as_of"].isoformat(), "models": {}}
+    evals = {}
     for code, label, k, setting, fn in MODELS + [COMPARE]:
         fits = fit_model(fn, d["fit"])
         e = evaluate(d, fn, fits, rng)
@@ -300,6 +327,7 @@ def main():
              "V1a": v1a(e, rng), "V1b_current": v1b(e, rng, "current"),
              "V1b_switching": v1b(e, rng, "switching"), "V3": v3(e), "holdout_ll": holdout_ll(e)}
         r["V2"], old_rate = v2(d, e, r["V1a"], r["V1b_current"])
+        evals[code] = e
         r["passes"] = all(x["pass"] for x in r["V1a"].values()) and r["V3"]["pass"] and r["V4"]
         res["models"][code] = r
         print(f"\n{code} {label}: V4 {'OK' if r['V4'] else 'FOUT'}, V1a "
@@ -309,7 +337,7 @@ def main():
             print(f"    segment {s}: α {f['alpha']:.4f}  β {f['beta']:.3f}  ({f['customers']:,.0f} klantperioden)")
         for g, x in r["V1a"].items():
             print(f"    V1a {g:<16} max {x['max_rel_err']:.2%} (norm {x['norm']:.1%}), gem {x['mae_rel']:.2%}, "
-                  f"interval {'ja' if x['inside_interval'] else 'nee (' + str(x['months_outside']) + ' mnd)'}"
+                  f"{x['months_outside']} mnd buiten interval (max {int(MAX_OUTSIDE * H)})"
                   f"  {'OK' if x['pass'] else 'FOUT'}")
     res["old_rate_q"] = old_rate
 
@@ -328,6 +356,7 @@ def main():
     margin = "switching" if (not cur_ok and sw_ok) else "current"
     advice = {"model": choice, "segmentation": ch["setting"][0], "returners": ch["setting"][1],
               "margin_method": margin}
+    ch["V2"], _ = v2(d, evals[choice], ch["V1a"], ch[f"V1b_{margin}"])
     res["advice"] = advice
     seg, ret, mm_ = d["settings"][2], d["settings"][3], d["settings"][4]
     res["matches_settings"] = (seg, ret, mm_) == (advice["segmentation"], advice["returners"], margin)
@@ -338,7 +367,7 @@ def main():
     for variant in ("current", "switching"):
         for g, x in ch[f"V1b_{variant}"].items():
             print(f"    {variant:<9} {g:<12} werkelijk €{x['actual_eur']:,.0f}  voorspeld €{x['pred_eur']:,.0f}  "
-                  f"fout {x['rel_err']:.2%} (norm {x['norm']:.0%}), interval {'ja' if x['inside_interval'] else 'nee'}  "
+                  f"fout {x['rel_err']:.2%} (norm {x['norm']:.0%}), {x['months_outside']} mnd buiten interval  "
                   f"{'OK' if x['pass'] else 'FOUT'}")
     print(f"V2 tegen de oude methode (vaste retentie {1 - old_rate:.2%} per kwartaal):")
     for g, x in ch["V2"].items():

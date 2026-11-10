@@ -29,6 +29,9 @@ Netlify      statische site
 | `20261110120000_ce_beanrise_api_tables.sql` | `bz_*`-tabellen (ruwe data van de Beanrise-API, contract v1.2) en `loads`; RLS en rechten |
 | `20261110140000_ce_v2_derive.sql` | `settings_v2`; afleiden uit `bz_*`: klantperioden, toestand per kwartaaleinde, klantenstroom per klantperiode, marge en overstappen per abonnement, late-verlengfactor, `sbg_input` |
 | `20261110150000_ce_v2_value.sql` | `sbg_runs`, `sbg_params`, `validation_runs`; DERL, CLV, customer equity, waterfall (acht balken), `publication_checks_v2`, `refresh_v2_base()`, `publish_v2()`; `ce_public.quarters_v2` en `publication_v2` (nog niet live) |
+| `20261110160000_ce_v2_deterministic.sql` | Geen parallelle optellingen bij verversen en publiceren (vaste volgorde) |
+| `20261110170000_ce_v2_tolerance.sql` | `jsonb_close()`: controle "afgesloten kwartaal ongewijzigd" met een tolerantie van één cent |
+| `20261110180000_ce_v2_mix_existing.sql` | Marge per factuur op de peildatum; gemiddelde CLV = Customer mix + Existing customer value; waterfall met vijf balken; nieuwe JSON en controles (ontwerp v3.4) |
 
 Uitvoeren: `.venv/bin/python scripts/apply_migrations.py` (alle bestanden in één transactie; stopt als `ce_private` al bestaat). Een nieuwe migratie op een bestaand schema: `.venv/bin/python scripts/apply_migrations.py supabase/migrations/<bestand>.sql` (die migratie plus de beveiligingsasserties, in één transactie).
 

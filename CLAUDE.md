@@ -253,6 +253,24 @@ Python-omgeving: `.venv` met scripts/requirements.txt.
 - Niet meer gebruiken: Shapley-decompositie, value/brand/relationship-drivers,
   margeopbouw per order (oud ontwerp).
 
+## Validatie van het CLV-model (sBG, in opbouw in ce_public.quarters_v2)
+scripts/validate_holdout.py, maandelijks in de Action. Holdout: schatten op de data zoals
+bekend op T, vergelijken met de 24 maanden daarna. Alleen een convergentiefout houdt de
+publicatie tegen; een gefaalde validatie laat de run falen (mail).
+- V1a overleving: grootste maandfout totaal ≤ 1,5%, per startabonnement en per groep ≤ 3%.
+- V1b gerealiseerde marge (prijs en kostprijs op het niveau van T): fout over 24 maanden
+  totaal ≤ 2%, per abonnement ≤ 3%.
+- Bij V1a en V1b: hoogstens 10% van de maanden buiten het 95%-voorspelinterval (ook een
+  perfect model valt in een maand met kans 5% buiten het interval; "alle 24 maanden binnen"
+  zou ook dan in ±71% van de gevallen falen).
+- V2: de nieuwe methode heeft een kleinere fout dan de oude (vaste retentie).
+- V3 kalibratie per klantduur: ≥ 90% van de cellen (≥ 200 klanten) binnen het 95%-binomiale
+  interval of ≤ 2 procentpunt.
+- V4 convergentie bij elke run: drie startpunten, kleine gradiënt, positief definiete Hessiaan.
+- Beslisregel: het eenvoudigste niveau (samen → terugkeerders apart → per startabonnement →
+  beide) dat V1a en V3 haalt; anders de hoogste holdout-likelihood. Marge met overstappen
+  alleen als het huidige abonnement V1b niet haalt en de overstapvariant wel.
+
 ## Open punten
 - pg_cron (beschikbaar, versie 1.6.4, nog niet geïnstalleerd) voor een geplande
   refresh bij live data. De cronjob valt onder de database-time-out van 2 minuten;
