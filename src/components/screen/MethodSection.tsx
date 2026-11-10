@@ -10,6 +10,8 @@ export function MethodSection({ view }: { view: View }) {
   const c = view.current
   const ex = c.clvExample
   const years = gb.num(a.horizonMonths / 12)
+  const WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten']
+  const yearsWord = WORDS[a.horizonMonths / 12] ?? years
   const perPlan = c.model.some((m) => m.segment > 0)
   const returning = c.model.some((m) => m.segment === 0)
   const fitted = perPlan
@@ -23,11 +25,11 @@ export function MethodSection({ view }: { view: View }) {
   ]
   const example =
     `A new ${gb.plan(ex.sizeGrams)} customer renews next month with a ${gb.pct(ex.nextInvoiceChance)} chance and is expected to pay ` +
-    `${gb.num(ex.expectedInvoices, 1)} more invoices within ${years} years (discounted). ` +
+    `${gb.num(ex.expectedInvoices, 1)} more invoices within ${years} years (in today's euros). ` +
     `At ${gb.clv(ex.marginPerInvoice)} margin per invoice, plus expected plan changes, that is a CLV of ${gb.clv(ex.value)}.`
   const rows: [string, string][] = [
     ['Horizon', `${years} years (${gb.num(a.horizonMonths)} monthly invoices); nothing after ${years} years counts.`],
-    ['Discount rate', `${pct0(a.discountRateYear)} per year.`],
+    ['Future margin in today\'s euros', `${pct0(a.discountRateYear)} per year — €1 in ${yearsWord} years counts as ${gb.clv(a.horizonDiscountFactor)} today.`],
     ['Margin', 'Price minus the cost of each delivery, excluding VAT; averaged over the last 12 months per plan; including expected up- and downgrades.'],
     ['Active customer', `Running subscription, or within ${a.graceDays} days after it expired.`],
     [`Customers within those ${a.graceDays} days`, `Count at the share that still renews (${gb.pct(c.lateRenewalFactor)}).`],

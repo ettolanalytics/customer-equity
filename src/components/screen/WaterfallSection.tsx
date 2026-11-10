@@ -148,7 +148,9 @@ export function WaterfallSection({ view }: { view: View }) {
   )
 
   return (
-    <section id="change" className="card section" aria-label="Change">
+    <>
+    <h2 id="contribution" className="sh">Contribution</h2>
+    <section id="change" className="card section" aria-label="Contribution">
       <div className="wf-head">
         <h2 className="section-title">
           Why did customer equity change by {gb.signedThousands(w.equityChange).replace(/^\+/, '')}?
@@ -223,5 +225,6 @@ export function WaterfallSection({ view }: { view: View }) {
         </div>
       </div>
     </section>
+    </>
   )
 }

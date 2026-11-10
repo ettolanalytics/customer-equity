@@ -164,5 +164,5 @@ a { color: #1d5fae; }
   .main { padding: 0; }
   .wrap { max-width: none; }
   .card, .qa, .wf-row, .method li, .ma-block { break-inside: avoid; }
-  #drivers, #change, #method { break-before: page; }
+  #drivers, #contribution, #method { break-before: page; }
 }

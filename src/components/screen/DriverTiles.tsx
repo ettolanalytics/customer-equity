@@ -63,7 +63,7 @@ function tiles(view: View) {
   const clv: Tile = {
     id: 'clv',
     label: 'CLV',
-    tip: `Average value of an active customer: the contribution margin we expect from them over the next ${gb.num(a.horizonMonths / 12)} years, discounted to today at ${gb.num(a.discountRateYear * 100)}% per year.`,
+    tip: `Average value of an active customer: the contribution margin we expect from them over the next ${gb.num(a.horizonMonths / 12)} years, in today's euros at ${gb.num(a.discountRateYear * 100)}% per year.`,
     value: gb.clv(c.avgClv),
     vsQuarter: countChange(c.avgClvVsPrevQuarter, vq, gb.signedClv),
     vsYear: countChange(c.avgClvVsYearAgo, vy, gb.signedClv),
@@ -175,11 +175,11 @@ export function DriverTiles({ view, ...hover }: { view: View } & HoverProps) {
   return (
     <>
       <div className="sh-row">
-        <h2 id="drivers" className="sh">What drives the value</h2>
+        <h2 id="drivers" className="sh">Value drivers</h2>
         <YearLegend view={view} />
       </div>
       {/* Raster: rij 1 de factoren, rij 2 hun drivers, elk groepje onder zijn factor. */}
-      <section aria-label="What drives the value" className="factors">
+      <section aria-label="Value drivers" className="factors">
         <div className="f-active">{card(t.active, BOX_FACTOR)}</div>
         <div className="f-clv">{card(t.clv, BOX_FACTOR)}</div>
         <div className="drivers drivers-3 d-active" aria-label="Drivers of active customers">

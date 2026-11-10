@@ -101,6 +101,7 @@ const out = V2 ? {
   assumptions: {
     discountRateYear: Number(p.discount_rate_year),
     horizonMonths: Number(p.horizon_months),
+    horizonDiscountFactor: Number(p.horizon_discount_factor),
     graceDays: Number(p.grace_days),
     asOf: p.as_of,
     generatedAt: p.generated_at,

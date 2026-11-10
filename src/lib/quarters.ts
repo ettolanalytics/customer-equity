@@ -44,6 +44,8 @@ export type Waterfall = {
   /** Per klant; in het jaar de som van de vier kwartalen. */
   customerMixPerCustomer: number
   existingCustomerValuePerCustomer: number
+  /** Alleen in de jaarwaterfall: 10% van |churn| (Executive summary S4). */
+  churnLever?: number
 }
 
 /** Rekenvoorbeeld: een nieuwe klant op het meest gekozen abonnement van het kwartaal. */
@@ -106,6 +108,8 @@ export type Quarter = {
 export type Assumptions = {
   discountRateYear: number
   horizonMonths: number
+  /** Wat €1 aan het eind van de horizon vandaag waard is: 1 ÷ (1 + disconto)^(jaren). */
+  horizonDiscountFactor: number
   graceDays: number
   asOf: string
   generatedAt: string
