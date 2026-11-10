@@ -40,3 +40,6 @@ Customer Equity-screenshot.png
 
 # Ontwerpnotities: alleen lokaal, nooit in deze publieke repo
 docs/
+
+# Python-bytecode
+__pycache__/

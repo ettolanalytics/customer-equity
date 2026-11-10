@@ -1,0 +1,64 @@
+# Haalt elke dag de nieuwe Beanrise-data op via de API (datacontract v1.2) en schrijft ze in
+# ce_private.bz_* (scripts/ingest_beanrise.py). Beanrise publiceert om 02:30 UTC.
+# Alles-of-niets: faalt een stap of controle, dan wordt niets geschreven en mailt GitHub.
+#
+# Publieke repo, dus publieke logs: de secrets worden gemaskeerd (ook host en wachtwoord los),
+# het script drukt alleen aantallen af, en er worden geen artifacts bewaard.
+#
+# Let op: GitHub zet geplande workflows uit als de repository 60 dagen geen activiteit
+# heeft. Zet hem dan weer aan onder Actions → Beanrise daily → Enable workflow.
+name: Beanrise daily
+
+on:
+  schedule:
+    - cron: '15 4 * * *' # dagelijks 04:15 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: beanrise-pipeline
+  cancel-in-progress: false
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Secrets maskeren
+        env:
+          BEANRISE_API_URL: ${{ secrets.BEANRISE_API_URL }}
+          CE_LOADER_DB_URL: ${{ secrets.CE_LOADER_DB_URL }}
+        run: |
+          python3 - <<'PY'
+          import os
+          from urllib.parse import urlparse
+          for name in ("BEANRISE_API_URL", "CE_LOADER_DB_URL"):
+              value = os.environ.get(name, "")
+              if not value:
+                  print(f"::error::Secret {name} ontbreekt.")
+                  raise SystemExit(1)
+              u = urlparse(value)
+              for part in (u.hostname, u.username, u.password, u.netloc, u.path.strip("/")):
+                  if part and len(part) > 3:
+                      print(f"::add-mask::{part}")
+          PY
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.13'
+
+      - name: Afhankelijkheden
+        run: python -m pip install --quiet --disable-pip-version-check 'psycopg[binary]==3.2.10'
+
+      - name: Ophalen en laden
+        env:
+          BEANRISE_API_URL: ${{ secrets.BEANRISE_API_URL }}
+          BEANRISE_API_KEY: ${{ secrets.BEANRISE_API_KEY }}
+          CE_LOADER_DB_URL: ${{ secrets.CE_LOADER_DB_URL }}
+        run: python scripts/ingest_beanrise.py
