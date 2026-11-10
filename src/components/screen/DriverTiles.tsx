@@ -1,7 +1,7 @@
 // "What drives the value": de twee factoren van customer equity (Active customers,
 // Average CLV) met hun drivers eronder (CLAUDE.md, Opbouw van het scherm).
 // Elke tegel in de stijl van het ontwerp: waarde, vergelijkingen, minigrafiek, hover.
-// Proefversie v2: drivers van de CLV zijn Customer mix en Existing customer value (ontwerp v3.4 §9).
+// Proefversie v2: drivers van de CLV zijn Mix effect en Value effect (data: customerMix, existingCustomerValue).
 // Minigrafiek: de laatste drie jaar, één lijn per jaar (YearChart).
 import type { ReactNode } from 'react'
 import type { ChartBox } from '../../lib/chart'
@@ -37,7 +37,7 @@ function countChange(change: Change | null, label: string, fmt: (v: number) => s
   return <ChangeLine up={up} good={up === goodWhenUp} pill={gb.pct(change.pct)} value={fmt(change.abs)} label={label} />
 }
 
-/** Vergelijking van een bijdrage met teken (Customer mix, Existing customer value): verschil in euro. */
+/** Vergelijking van een bijdrage met teken (Mix effect, Value effect): verschil in euro. */
 function diffChange(diff: number | null, label: string) {
   if (diff === null) return null
   const up = diff >= 0
@@ -109,25 +109,25 @@ function tiles(view: View) {
   ]
   const clvDrivers: Tile[] = [
     {
-      label: 'Customer mix',
-      tip: 'Change in average CLV because different customers joined and left, for example new customers who are not yet expected to stay as long.',
+      label: 'Mix effect',
+      tip: 'Change in average CLV from attracting and losing customers with a different value than the average.',
       value: gb.signedClv(c.customerMix),
       vsQuarter: diffChange(c.customerMixVsPrevQuarter, vq),
       vsYear: diffChange(c.customerMixVsYearAgo, vy),
       metric: (q) => q.customerMix,
-      aria: 'Line chart of the customer mix effect on average CLV per quarter',
+      aria: 'Line chart of the mix effect on average CLV per quarter',
       axis: gb.axisSignedClv,
       zero: true,
       read: (h) => hoverText(h, (q) => q.customerMix, gb.signedClv),
     },
     {
-      label: 'Existing customer value',
-      tip: 'Change in average CLV because customers who stayed became more or less valuable, for example by staying longer or changing plans.',
+      label: 'Value effect',
+      tip: 'Change in average CLV because existing customers became more or less valuable.',
       value: gb.signedClv(c.existingCustomerValue),
       vsQuarter: diffChange(c.existingCustomerValueVsPrevQuarter, vq),
       vsYear: diffChange(c.existingCustomerValueVsYearAgo, vy),
       metric: (q) => q.existingCustomerValue,
-      aria: 'Line chart of the existing customer value effect on average CLV per quarter',
+      aria: 'Line chart of the value effect on average CLV per quarter',
       axis: gb.axisSignedClv,
       zero: true,
       read: (h) => hoverText(h, (q) => q.existingCustomerValue, gb.signedClv),

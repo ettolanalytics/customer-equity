@@ -18,6 +18,20 @@ export function niceTicks(min: number, max: number, count: number) {
   }
 }
 
+/** Ronde ticks binnen [min, max] (min ≤ 0 ≤ max): de kleinste ronde stap met hoogstens max ticks. */
+export function ticksWithin(min: number, max: number, maxTicks: number) {
+  const NICE = [1, 2, 2.5, 5]
+  const span = Math.max(max - min, 1e-9)
+  for (let e = Math.floor(Math.log10(span / maxTicks)) - 1; ; e++) {
+    for (const n of NICE) {
+      const step = n * Math.pow(10, e)
+      const ticks: number[] = []
+      for (let k = Math.ceil(min / step); k * step <= max + 1e-12; k++) ticks.push(k * step === 0 ? 0 : k * step)
+      if (ticks.length <= maxTicks) return { ticks, step }
+    }
+  }
+}
+
 /** Positie als percentage van de grafiek, voor HTML-labels over de SVG. */
 export const pctOf = (v: number) => Math.round(v * 100) / 100 + '%'
 
@@ -56,9 +70,11 @@ export function lineChart(
   mn -= pad
   mx += pad
   if (Math.min(...all) >= 0) mn = Math.max(0, mn)
-  const nt = niceTicks(mn, mx, count)
-  const y0 = nt.ticks[0]
-  const y1 = nt.ticks[nt.ticks.length - 1]
+  // zero: de as volgt de zichtbare waarden (niet afgerond op ronde ticks), met hoogstens
+  // count + 1 ronde ticks binnen dat bereik, altijd inclusief 0.
+  const nt = zero ? ticksWithin(mn, mx, count + 1) : niceTicks(mn, mx, count)
+  const y0 = zero ? mn : nt.ticks[0]
+  const y1 = zero ? mx : nt.ticks[nt.ticks.length - 1]
   const fmt = format(nt.step)
   const step = (W - L - R) / (labels.length - 1)
   const xs = (i: number) => L + i * step

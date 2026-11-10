@@ -34,14 +34,14 @@ function items(w: Waterfall, mode: Mode): Item[] {
     { label: 'Reacquired customers', value: p.reacquiredCustomers, note: `${gb.num(c.reacquiredCustomers)} reacquired customers${atStart}.` },
     { label: 'Churn', value: p.churn, note: `${gb.num(c.churn)} customers churned${atStart}.` },
     {
-      label: 'Customer mix',
+      label: 'Mix effect',
       value: p.customerMix,
-      note: `Average CLV ${gb.signedClv(w.customerMixPerCustomer)} from the customer mix${perCustomer}.`,
+      note: `Average CLV ${gb.signedClv(w.customerMixPerCustomer)} from the mix effect${perCustomer}.`,
     },
     {
-      label: 'Existing customer value',
+      label: 'Value effect',
       value: p.existingCustomerValue,
-      note: `Average CLV ${gb.signedClv(w.existingCustomerValuePerCustomer)} from existing customers${perCustomer}.`,
+      note: `Average CLV ${gb.signedClv(w.existingCustomerValuePerCustomer)} from the value effect${perCustomer}.`,
     },
   ]
 }

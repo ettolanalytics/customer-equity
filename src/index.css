@@ -63,7 +63,10 @@ a { color: #1d5fae; }
 
 /* Hero */
 .hero { display: flex; flex-wrap: wrap; gap: 14px; align-items: stretch; }
-.card-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.card-head { display: flex; align-items: center; gap: 6px; flex-wrap: nowrap; min-width: 0; }
+/* Titels altijd op één regel; past het echt niet, dan afgekapt met … (de tooltip staat ernaast). */
+.card-head > .lbl { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.card-head > .tip { flex: 0 0 auto; }
 .period { margin-left: auto; font-size: 12px; font-weight: 500; color: #8a8984; white-space: nowrap; }
 .hero-val { margin: 10px 0 0; font-size: 48px; font-weight: 700; letter-spacing: -0.03em; line-height: 1.05; white-space: nowrap; }
 .hero-note { margin: 6px 0 0; font-size: 13px; color: #5c5b56; }
@@ -88,11 +91,13 @@ a { color: #1d5fae; }
 .f-active > .tile, .f-clv > .tile { flex: 1 1 auto; }
 .d-active { grid-area: ad; }
 .d-clv { grid-area: cd; }
-@media (max-width: 1000px) {
+@media (max-width: 1100px) {
   .factors { grid-template-columns: minmax(0, 1fr); grid-template-areas: "a" "ad" "c" "cd"; }
   .f-clv { margin-top: 14px; }
 }
-.tile { padding: 22px 24px; min-width: 0; }
+.tile { padding: 22px 24px; min-width: 0; container-type: inline-size; }
+/* Smalle tegel: kwartaallabel weg (staat al in de paginatitel), zodat de titel op één regel past. */
+@container (max-width: 190px) { .card-head > .period { display: none; } }
 .drivers .tile { padding: 18px 18px; }
 .drivers .tile-val { font-size: 24px; }
 /* Drivers onder hun factor, met een haak zoals bij de groepen in de waterfall. */

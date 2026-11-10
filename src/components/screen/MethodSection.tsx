@@ -25,11 +25,11 @@ const steps = (current: Quarter) => {
     },
     {
       title: 'Why average CLV changes',
-      text: `Customer mix: different customers joined and left (new customers are not yet expected to stay as long). Existing customer value: customers who stayed became more or less valuable. Together they are the change in average CLV. Average CLV = ${gb.num(current.expectedInvoices, 1)} expected invoices × ${gb.clv(current.marginPerFutureInvoice)} margin per future invoice.`,
+      text: `Mix effect: the customers who joined and left had a different value than the average. Value effect: existing customers became more or less valuable. Together they are the change in average CLV. Average CLV = ${gb.num(current.expectedInvoices, 1)} expected invoices × ${gb.clv(current.marginPerFutureInvoice)} margin per future invoice.`,
     },
     {
       title: 'Change per quarter',
-      text: 'New, reacquired and churned customers are valued at the average CLV at the start of the period; customer mix and existing customer value are multiplied by the number of customers at the end. The year view adds up the four quarters.',
+      text: 'New, reacquired and churned customers are valued at the average CLV at the start of the period; the mix effect and the value effect are multiplied by the number of customers at the end. The year view adds up the four quarters.',
     },
     {
       title: 'Acquisition costs',

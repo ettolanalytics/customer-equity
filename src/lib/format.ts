@@ -45,7 +45,7 @@ export const gb = {
       : gbNum(value, axisDecimals(value, step)),
   /** Asopmaak euro per klant, max. 3 cijfers: "€250", "€31.5" */
   axisClv: (step: number) => (value: number) => '€' + gbNum(value, axisDecimals(value, step)),
-  /** Asopmaak euro per klant met teken (Customer mix, Existing customer value): "−€2", "€0", "€5" */
+  /** Asopmaak euro per klant met teken (Mix effect, Value effect): "−€2", "€0", "€5" */
   axisSignedClv: (step: number) => (value: number) =>
     (value < -1e-9 ? '−' : '') + '€' + gbNum(Math.abs(value), axisDecimals(Math.abs(value), step)),
   /** Datum: "2026-11-09" → "9 Nov 2026" */

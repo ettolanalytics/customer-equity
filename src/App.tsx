@@ -13,8 +13,8 @@ import { defaultIndex, viewFor, type Hover, type View } from './lib/quarters'
 /**
  * Antwoordzin (CLAUDE.md Schermteksten 1 en 7), met het waarom: customer equity =
  * actieve klanten × gemiddelde CLV. Eerst wat er gebeurde, dan welke factor de
- * doorslag gaf, dan elke factor apart. De reden voor de CLV is de grootste van Customer mix
- * en Existing customer value over de vier kwartalen. Alle getallen komen uit de data; hier
+ * doorslag gaf, dan elke factor apart. De reden voor de CLV is de grootste van het mix effect
+ * en het value effect over de vier kwartalen. Alle getallen komen uit de data; hier
  * worden alleen woorden gekozen op teken en grootte.
  */
 function answer({ current: c, yearAgo }: View): string {
@@ -35,8 +35,8 @@ function answer({ current: c, yearAgo }: View): string {
         : `the ${clv} outweighed the ${base}`
   const existingMain = Math.abs(s.existingCustomerValue) >= Math.abs(s.customerMix)
   const clvReason = existingMain
-    ? `existing customers became ${s.existingCustomerValue >= 0 ? 'more' : 'less'} valuable`
-    : 'of the customer mix'
+    ? `existing customers became ${s.existingCustomerValue >= 0 ? 'more' : 'less'} valuable (value effect)`
+    : `of the customer mix: the customers who joined and left were worth ${s.customerMix >= 0 ? 'more' : 'less'} than the average (mix effect)`
 
   return [
     `Customer equity ${equityUp ? 'grew' : 'fell'} ${gb.eurShort(y.abs)} (${gb.signedPct(y.pct)}) vs ${yearAgo.label}, because ${why}.`,

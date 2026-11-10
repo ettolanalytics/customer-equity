@@ -4,7 +4,7 @@ import raw from '../data/quarters.json'
 
 export type Change = { abs: number; pct: number }
 
-/** Antwoordzin: de laatste vier kwartalen. Customer mix + Existing customer value = avgClvChange. */
+/** Antwoordzin: de laatste vier kwartalen. Mix effect (customerMix) + value effect (existingCustomerValue) = avgClvChange. */
 export type YearSummary = {
   acquiredCustomers: number
   newCustomers: number
