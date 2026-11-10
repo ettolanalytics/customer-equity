@@ -187,9 +187,6 @@ export function DriverTiles({ view, ...hover }: { view: View } & HoverProps) {
         </div>
         <div className="drivers drivers-2 d-clv" aria-label="Drivers of average CLV">
           {t.clvDrivers.map((d) => card(d, BOX_DRIVER))}
-          <p className="d-sum">
-            Together: {gb.signedClv(view.current.avgClvChange)} change in CLV vs {view.previous.label.split(' ')[0]}
-          </p>
         </div>
       </section>
     </>

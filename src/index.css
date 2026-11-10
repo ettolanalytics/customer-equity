@@ -21,7 +21,6 @@ a { color: #1d5fae; }
 .tt { display: none; position: absolute; z-index: 20; top: 22px; left: 50%; transform: translateX(-50%); width: 260px; padding: 9px 11px; background: #111110; color: #ffffff; font-size: 12px; font-weight: 400; line-height: 1.5; border-radius: 8px; text-align: left; white-space: normal; letter-spacing: 0; }
 .tip:hover .tt, .tip:focus-within .tt { display: block; }
 .tbtn { font: inherit; font-size: 13px; color: #111110; background: #ffffff; border: 1px solid #e0dfd9; border-radius: 8px; min-height: 36px; padding: 0 12px; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
-.d-sum { grid-column: 1 / -1; margin: 2px 0 0; font-size: 12px; color: #5c5b56; }
 .asof { font-size: 12px; color: #8a8984; white-space: nowrap; }
 .tbtn:hover { background: #f5f5f3; }
 .qpick { position: relative; }
@@ -31,11 +30,14 @@ a { color: #1d5fae; }
 .nav a { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; color: #5c5b56; text-decoration: none; font-size: 13px; min-height: 36px; }
 .nav a:hover { background: #f0efec; color: #111110; }
 .nav a.on { background: #eef3fb; color: #1d5fae; font-weight: 500; }
-.side { flex: 0 0 220px; padding: 20px 14px; border-right: 1px solid #e6e5e0; background: #fbfbfa; }
+.side { flex: 0 0 220px; padding: 20px 14px; border-right: 1px solid #e6e5e0; background: #fbfbfa;
+  position: sticky; top: 56px; align-self: flex-start; height: calc(100vh - 56px); overflow-y: auto; }
+/* Ankers niet onder de vaste bovenbalk laten verdwijnen. */
+.app [id] { scroll-margin-top: 72px; }
 .navh { margin: 4px 10px 10px; font-size: 11px; font-weight: 500; color: #8a8984; letter-spacing: .04em; }
 
 /* Kop */
-.topbar { height: 56px; background: #ffffff; border-bottom: 1px solid #e6e5e0; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 16px; }
+.topbar { position: sticky; top: 0; z-index: 20; height: 56px; background: #ffffff; border-bottom: 1px solid #e6e5e0; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 16px; }
 .topbar-l { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .topbar-r { display: flex; align-items: center; gap: 8px; }
 .logo { width: 28px; height: 28px; border-radius: 8px; background: #1d5fae; display: inline-flex; align-items: center; justify-content: center; flex: 0 0 28px; }
@@ -70,7 +72,8 @@ a { color: #1d5fae; }
 .decomp { margin: 14px 0 0; padding-top: 12px; border-top: 1px solid #eeede8; font-size: 13px; color: #5c5b56; }
 
 @media (max-width: 820px) {
-  .side { flex: 1 1 100%; border-right: none; border-bottom: 1px solid #e6e5e0; padding: 10px 12px; }
+  .side { flex: 1 1 100%; border-right: none; border-bottom: 1px solid #e6e5e0; padding: 10px 12px;
+    position: static; height: auto; overflow: visible; }
   .nav { flex-direction: row; flex-wrap: wrap; }
   .side .navh { display: none; }
   .hide-s { display: none; }
@@ -142,7 +145,7 @@ a { color: #1d5fae; }
   body, .app { background: #ffffff; min-height: 0; }
   .app { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .side, .topbar-r, .title-row > a.tbtn, .ib, .tt, .seg { display: none !important; }
-  .topbar { height: auto; padding: 0 0 10px; border-bottom: none; }
+  .topbar { position: static; height: auto; padding: 0 0 10px; border-bottom: none; }
   .topbar .tbtn { border: none; padding: 0; }
   .topbar .tbtn svg { display: none; }
   .main { padding: 0; }

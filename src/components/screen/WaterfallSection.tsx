@@ -55,7 +55,7 @@ export function WaterfallSection({ view }: { view: View }) {
   const all = items(w, mode)
   const added = all.filter((i) => i.value >= 0)
   const lost = all.filter((i) => i.value < 0)
-  const vsLabel = mode === 'year' ? 'vs ' + w.fromLabel : view.vsQuarterLabel
+  const vsLabel = mode === 'year' ? view.vsYearLabel : view.vsQuarterLabel
 
   type Step = { label: string; total: boolean; value: number; group: 0 | 1 | null }
   const steps: Step[] = [

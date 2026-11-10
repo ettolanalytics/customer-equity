@@ -17,7 +17,7 @@ import { defaultIndex, viewFor, type Hover, type View } from './lib/quarters'
  * en Existing customer value over de vier kwartalen. Alle getallen komen uit de data; hier
  * worden alleen woorden gekozen op teken en grootte.
  */
-function answer({ current: c, vsYearLabel }: View): string {
+function answer({ current: c, yearAgo }: View): string {
   const y = c.equityVsYearAgo
   const s = c.yearSummary
   const n = c.activeVsYearAgo
@@ -39,7 +39,7 @@ function answer({ current: c, vsYearLabel }: View): string {
     : 'of the customer mix'
 
   return [
-    `Customer equity ${equityUp ? 'grew' : 'fell'} ${gb.eurShort(y.abs)} (${gb.signedPct(y.pct)}) ${vsYearLabel}, because ${why}.`,
+    `Customer equity ${equityUp ? 'grew' : 'fell'} ${gb.eurShort(y.abs)} (${gb.signedPct(y.pct)}) vs ${yearAgo.label}, because ${why}.`,
     `Over the last four quarters, the customer base ${customersUp ? 'grew' : 'shrank'} by ${gb.num(Math.abs(n.abs))} ` +
       `to ${gb.num(c.activeEnd)}: ${gb.num(s.acquiredCustomers)} customers were acquired ` +
       `(${gb.num(s.newCustomers)} new, ${gb.num(s.reacquiredCustomers)} reacquired) and ${gb.num(s.churn)} churned.`,
@@ -72,13 +72,6 @@ function App() {
                   <h1 className="title">Customer Equity</h1>
                   <p className="subtitle">The value of your current customers · {current.label}</p>
                 </div>
-                <a href="#method" className="tbtn" style={{ textDecoration: 'none' }}>
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5c5b56" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
-                    <circle cx="12" cy="12" r="9" />
-                    <path d="M12 11v5M12 8h.01" />
-                  </svg>
-                  How to read this page
-                </a>
               </div>
               <div className="qa">
                 <p className="qa-q">Is your customer base worth more than a year ago?</p>

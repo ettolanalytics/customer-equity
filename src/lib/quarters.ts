@@ -148,7 +148,7 @@ export type View = {
   current: Quarter
   previous: Quarter
   yearAgo: Quarter
-  /** "vs Q2" en "vs Q3 2025", zoals in het ontwerp. */
+  /** Vergelijkingslabels: "QoQ" (vorig kwartaal) en "YoY" (een jaar eerder). */
   vsQuarterLabel: string
   vsYearLabel: string
   /** De laatste drie jaar t/m het gekozen kwartaal, oudste eerst (alleen jaren met data). */
@@ -178,8 +178,8 @@ export function viewFor(index: number): View {
     current: quarters[index],
     previous,
     yearAgo,
-    vsQuarterLabel: 'vs ' + previous.label.split(' ')[0],
-    vsYearLabel: 'vs ' + yearAgo.label,
+    vsQuarterLabel: 'QoQ',
+    vsYearLabel: 'YoY',
   }
 }
 
