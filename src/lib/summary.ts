@@ -19,7 +19,7 @@ export const IN_LINE_SHARE = 0.005
 export const FLAT_SHARE = 0.001
 /** S2 "held steady": klanten of CLV veranderden minder dan 0,05% (afgerond 0,0%). */
 export const STEADY = 0.0005
-/** S3 verlies door churn tegenover de waarde van nieuwe klanten, r = |churn| ÷ new. */
+/** S3 verlies door churn tegenover de waarde van alle instromers, r = |churn| ÷ (new + reacquired). */
 export const CHURN_WORDS: { min: number; words: string }[] = [
   { min: 1, words: 'more than' },
   { min: 0.75, words: 'almost as much as' },
@@ -151,27 +151,30 @@ export function executiveSummary(i: SummaryInput): { sentences: string[]; branch
     let item = ''
     let tail = ''
     if (worst.k === 'churn') {
-      const ratio = i.parts.newCustomers > 0 ? Math.abs(i.parts.churn) / i.parts.newCustomers : Infinity
+      // Vertrokken klanten tegenover alle instromers (new + reacquired), zoals in S2.
+      const joined = i.parts.newCustomers + i.parts.reacquiredCustomers
+      const ratio = joined > 0 ? Math.abs(i.parts.churn) / joined : Infinity
       const C = CHURN_WORDS.find((t) => ratio >= t.min)!.words
       item = 'customers who left'
-      tail = `, ${C} new customers added (${amount(i.parts.newCustomers)})`
+      tail = `, ${C} customers who joined (${amount(joined)})`
       s3 = `churn: ${C}`
     } else if (worst.k === 'existingCustomerValue') {
       item = 'existing customers becoming less valuable'
       s3 = 'value effect'
     } else if (worst.k === 'customerMix') {
       const s2Mix = dv !== 0 && !valMain
+      // Zelfde naam als op het scherm: "Mix effect".
+      item = 'the mix effect'
       if (s2Mix && i.mix < 0) {
         // S2 legde hetzelfde negatieve mix effect al uit: geen herhaling.
-        item = 'the customer mix'
         s3 = 'mix effect (al uitgelegd)'
       } else if (s2Mix) {
-        // Over het jaar verhoogde het mix effect de CLV (S2), maar de balk is negatief: het mix
-        // effect wisselde per kwartaal van teken en woog zwaarder in kwartalen met meer klanten.
-        item = 'the customer mix in some quarters'
-        s3 = 'mix effect (in sommige kwartalen)'
+        // Het bedrag is de som over het jaar van de balken (klanten × mix effect per kwartaal) en is
+        // negatief, terwijl het mix effect per klant over het jaar de CLV verhoogde (S2). Beide kloppen:
+        // de negatieve kwartalen hadden meer klanten. De zin noemt dat verschil, geen kwartalen.
+        tail = ', although it raised average CLV over the year'
+        s3 = 'mix effect (balk −, CLV +)'
       } else {
-        item = 'the customer mix'
         tail = `: ${mixReason(false)}`
         s3 = 'mix effect'
       }
@@ -179,7 +182,7 @@ export function executiveSummary(i: SummaryInput): { sentences: string[]; branch
     // Stabiele CLV maar een verlies in value of mix effect: dan compenseerde het andere effect het.
     const other = worst.k === 'existingCustomerValue' ? i.parts.customerMix : worst.k === 'customerMix' ? i.parts.existingCustomerValue : 0
     if (dv === 0 && other > 0) {
-      tail += `, offset by ${worst.k === 'existingCustomerValue' ? 'a better customer mix' : 'existing customers becoming more valuable'} (${amount(other)})`
+      tail += `, offset by ${worst.k === 'existingCustomerValue' ? 'the mix effect' : 'existing customers becoming more valuable'} (${amount(other)})`
       s3 += ', gecompenseerd'
     }
     sentences.push(`The largest loss came from ${item} (${amount(worst.value)})${tail}.`)

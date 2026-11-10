@@ -98,12 +98,17 @@ describe('2. Verklaring', () => {
 describe('3. Grootste effect (opbouw overal gelijk; drempels vast)', () => {
   it('churn: meer dan de nieuwe klanten (r ≥ 1)', () => {
     expect(run({ parts: parts({ churn: -3_000_000 }) }).sentences[2]).toBe(
-      'The largest loss came from customers who left (€3.0m), more than new customers added (€2.5m).',
+      'The largest loss came from customers who left (€3.0m), more than customers who joined (€2.8m).',
     )
   })
-  it('churn: bijna even veel (0,75 ≤ r < 1)', () => {
+  it('churn: bijna even veel (0,75 ≤ r < 1), tegenover new + reacquired', () => {
+    expect(run({ parts: parts({ churn: -2_200_000 }) }).sentences[2]).toBe(
+      'The largest loss came from customers who left (€2.2m), almost as much as customers who joined (€2.8m).',
+    )
+  })
+  it('churn telt reacquired mee: €2.0m tegenover €2.8m is "more than half of"', () => {
     expect(run().sentences[2]).toBe(
-      'The largest loss came from customers who left (€2.0m), almost as much as new customers added (€2.5m).',
+      'The largest loss came from customers who left (€2.0m), more than half of customers who joined (€2.8m).',
     )
   })
   it('churn: meer dan de helft (0,5 ≤ r < 0,75)', () => {
@@ -112,8 +117,8 @@ describe('3. Grootste effect (opbouw overal gelijk; drempels vast)', () => {
   it('churn: minder dan de helft (r < 0,5)', () => {
     expect(run({ parts: parts({ churn: -1_000_000 }) }).branches.s3).toBe('churn: less than half of')
   })
-  it('churn zonder nieuwe klanten telt als "more than"', () => {
-    expect(run({ parts: parts({ newCustomers: 0 }) }).branches.s3).toBe('churn: more than')
+  it('churn zonder instromers telt als "more than"', () => {
+    expect(run({ parts: parts({ newCustomers: 0, reacquiredCustomers: 0 }) }).branches.s3).toBe('churn: more than')
   })
   it('value effect als grootste verlies', () => {
     expect(run({ parts: parts({ churn: -500_000, existingCustomerValue: -860_000 }) }).sentences[2]).toBe(
@@ -122,23 +127,31 @@ describe('3. Grootste effect (opbouw overal gelijk; drempels vast)', () => {
   })
   it('mix effect als grootste verlies, met uitleg voor beide groepen', () => {
     expect(run({ parts: parts({ churn: -100_000, customerMix: -1_200_000 }) }).sentences[2]).toBe(
-      'The largest loss came from the customer mix (€1.2m): customers who joined were worth less, or leavers more, than existing customers.',
+      'The largest loss came from the mix effect (€1.2m): customers who joined were worth less, or leavers more, than existing customers.',
     )
   })
   it('mix effect: geen herhaling als S2 hetzelfde negatieve mix effect al uitlegde', () => {
     const r = run({ v: -0.02, mix: -8, val: 1, parts: parts({ churn: -100_000, customerMix: -1_200_000 }) })
-    expect(r.sentences[2]).toBe('The largest loss came from the customer mix (€1.2m).')
+    expect(r.sentences[2]).toBe('The largest loss came from the mix effect (€1.2m).')
     expect(r.sentences[1]).toContain('mainly because customers who joined were worth less, or leavers more, than existing customers')
   })
   it('stabiele CLV, verlies in value effect: gecompenseerd door de mix', () => {
     const r = run({ n: 0.0001, v: 0.0002, parts: parts({ churn: -400_000, existingCustomerValue: -950_000, customerMix: 930_000 }) })
     expect(r.sentences[1]).toBe('Customers and average CLV both held steady.')
-    expect(r.sentences[2]).toBe('The largest loss came from existing customers becoming less valuable (€950k), offset by a better customer mix (€930k).')
+    expect(r.sentences[2]).toBe('The largest loss came from existing customers becoming less valuable (€950k), offset by the mix effect (€930k).')
   })
   it('stabiele CLV, verlies in mix effect: gecompenseerd door bestaande klanten', () => {
     expect(run({ v: 0.0001, parts: parts({ churn: -100_000, customerMix: -1_100_000, existingCustomerValue: 1_050_000 }) }).sentences[2]).toBe(
-      'The largest loss came from the customer mix (€1.1m): customers who joined were worth less, or leavers more, than existing customers, offset by existing customers becoming more valuable (€1.1m).',
+      'The largest loss came from the mix effect (€1.1m): customers who joined were worth less, or leavers more, than existing customers, offset by existing customers becoming more valuable (€1.1m).',
     )
+  })
+  it('mix-balk negatief terwijl het mix effect de CLV verhoogde: zin klopt met het jaarbedrag', () => {
+    const r = run({ v: 0.04, mix: 6, val: 1, parts: parts({ churn: -200_000, customerMix: -450_000 }) })
+    expect(r.sentences[1]).toContain('mainly because customers who joined were worth more, or leavers less, than existing customers')
+    expect(r.sentences[2]).toBe('The largest loss came from the mix effect (€450k), although it raised average CLV over the year.')
+  })
+  it('geen nieuwe term: de summary noemt het mix effect zoals op het scherm', () => {
+    expect(run({ parts: parts({ churn: -100_000, customerMix: -1_200_000 }) }).sentences.join(' ')).not.toMatch(/customer mix/)
   })
   it('geen negatief onderdeel: geen derde zin', () => {
     expect(run({ parts: parts({ churn: 0 }) }).sentences).toHaveLength(2)
@@ -176,6 +189,9 @@ describe('grenzen over alle combinaties', () => {
   it('stabiele CLV met verlies in value of mix effect: altijd met compensatie', () => {
     expect(steadyLoss.length).toBeGreaterThan(0)
     for (const s of steadyLoss) expect(s[2]).toContain('offset by')
+  })
+  it('geen termen die niet op het scherm staan', () => {
+    for (const s of all) expect(s.join(' ')).not.toMatch(/customer mix|in some quarters/)
   })
   it('geen advies en geen oorzaken buiten de data', () => {
     for (const s of all) expect(s.join(' ')).not.toMatch(/\b(should|must|need to|campaign|season|price)\b/i)
