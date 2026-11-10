@@ -35,9 +35,14 @@ def _ll_grad(x, n, churned, w):
 
 def fit(n, churned, w):
     """Schat α, β. Geeft dict met alpha, beta, cov (van log α, log β), loglik, checks."""
-    n = np.asarray(n, float)
-    churned = np.asarray(churned, bool)
-    w = np.asarray(w, float)
+    # Vaste invoer, los van de volgorde waarin de rijen binnenkomen: zelfde (n, churn) samenvoegen
+    # en sorteren. Zo geeft dezelfde data bit voor bit dezelfde α en β (nodig voor de controle
+    # "afgesloten kwartaal ongewijzigd").
+    code = np.asarray(n, np.int64) * 2 + np.asarray(churned, np.int64)
+    keys, inv = np.unique(code, return_inverse=True)
+    w = np.bincount(inv.ravel(), weights=np.asarray(w, float))
+    n = (keys // 2).astype(float)
+    churned = (keys % 2).astype(bool)
     total = w.sum()
     runs = []
     for x0 in STARTS:
