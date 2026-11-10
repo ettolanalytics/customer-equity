@@ -110,7 +110,7 @@ function tiles(view: View) {
   const clvDrivers: Tile[] = [
     {
       label: 'Mix effect',
-      tip: 'Change in average CLV from attracting and losing customers with a different value than the average.',
+      tip: 'Change in average CLV because the customers who joined and left were, on average, worth more or less than the ones who stayed.',
       value: gb.signedClv(c.customerMix),
       vsQuarter: diffChange(c.customerMixVsPrevQuarter, vq),
       vsYear: diffChange(c.customerMixVsYearAgo, vy),
