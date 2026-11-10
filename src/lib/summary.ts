@@ -84,6 +84,12 @@ export function summaryInput(view: View): SummaryInput | null {
   }
 }
 
+/** Mix effect in woorden, voor beide groepen: nieuwe klanten en vertrekkers, tegenover de blijvers. */
+export const mixReason = (positive: boolean) =>
+  positive
+    ? 'customers who joined were worth more, or leavers less, than existing customers'
+    : 'customers who joined were worth less, or leavers more, than existing customers'
+
 const words = (sentence: string) => sentence.split(/\s+/).filter(Boolean).length
 export const wordCount = (sentences: string[]) => sentences.reduce((a, s) => a + words(s), 0)
 
@@ -99,10 +105,10 @@ export function executiveSummary(i: SummaryInput): { sentences: string[]; branch
     const diff = i.change - i.changePrev
     const prev = signedAmount(i.changePrev)
     if (diff > IN_LINE_SHARE * i.ce1) {
-      compare = `, a better result than the year before (${prev})`
+      compare = `, better than the year before (${prev})`
       s1 += ', beter'
     } else if (diff < -IN_LINE_SHARE * i.ce1) {
-      compare = `, a weaker result than the year before (${prev})`
+      compare = `, worse than the year before (${prev})`
       s1 += ', zwakker'
     } else {
       compare = `, in line with the year before (${prev})`
@@ -121,10 +127,10 @@ export function executiveSummary(i: SummaryInput): { sentences: string[]; branch
   const clv = dv === 0 ? 'average CLV held steady' : `average CLV ${dv > 0 ? 'rose' : 'fell'} ${pct(i.v)}`
   const join = dn !== 0 && dv !== 0 && dn !== dv ? 'but' : 'and'
   // De grootste in absolute zin heeft altijd het teken van de CLV-verandering (mix + value).
+  // Mix effect > 0: nieuwe klanten meer waard dan de blijvers en/of vertrekkers minder waard;
+  // de zin noemt daarom beide groepen, elk met de juiste richting.
   const valMain = Math.abs(i.val) >= Math.abs(i.mix)
-  const R = valMain
-    ? `existing customers became ${i.val >= 0 ? 'more' : 'less'} valuable`
-    : `customers who joined and left were worth ${i.mix >= 0 ? 'more' : 'less'} than those who stayed`
+  const R = valMain ? `existing customers became ${i.val >= 0 ? 'more' : 'less'} valuable` : mixReason(i.mix >= 0)
   const S2 =
     dn === 0 && dv === 0
       ? 'Customers and average CLV both held steady.'
@@ -135,24 +141,48 @@ export function executiveSummary(i: SummaryInput): { sentences: string[]; branch
   const r = dv === 0 ? 'geen reden (CLV gelijk)' : valMain ? (i.val >= 0 ? 'value +' : 'value −') : i.mix >= 0 ? 'mix +' : 'mix −'
 
   // 3. Grootste effect (nog niet besloten; werkt zoals voorheen): het onderdeel met de grootste
-  //    negatieve waarde in de jaarwaterfall.
+  //    negatieve waarde in de jaarwaterfall. Opbouw in elke tak gelijk:
+  //    "The largest loss came from {onderdeel} ({bedrag}){aanvulling}."
   const keys: (keyof SummaryParts)[] = ['newCustomers', 'reacquiredCustomers', 'churn', 'customerMix', 'existingCustomerValue']
   const worst = keys.map((k) => ({ k, value: i.parts[k] })).reduce((a, b) => (b.value < a.value ? b : a))
   const sentences = [S1, S2]
   let s3 = 'geen negatief onderdeel'
   if (worst.value < 0) {
+    let item = ''
+    let tail = ''
     if (worst.k === 'churn') {
       const ratio = i.parts.newCustomers > 0 ? Math.abs(i.parts.churn) / i.parts.newCustomers : Infinity
       const C = CHURN_WORDS.find((t) => ratio >= t.min)!.words
-      sentences.push(`The customers you lost were worth ${amount(i.parts.churn)}, ${C} the value of new customers added (${amount(i.parts.newCustomers)}).`)
+      item = 'customers who left'
+      tail = `, ${C} new customers added (${amount(i.parts.newCustomers)})`
       s3 = `churn: ${C}`
     } else if (worst.k === 'existingCustomerValue') {
-      sentences.push(`The largest loss came from existing customers becoming less valuable (${amount(i.parts.existingCustomerValue)}).`)
+      item = 'existing customers becoming less valuable'
       s3 = 'value effect'
     } else if (worst.k === 'customerMix') {
-      sentences.push(`The largest loss came from customers who joined and left being worth less than those who stayed (${amount(i.parts.customerMix)}).`)
-      s3 = 'mix effect'
+      const s2Mix = dv !== 0 && !valMain
+      if (s2Mix && i.mix < 0) {
+        // S2 legde hetzelfde negatieve mix effect al uit: geen herhaling.
+        item = 'the customer mix'
+        s3 = 'mix effect (al uitgelegd)'
+      } else if (s2Mix) {
+        // Over het jaar verhoogde het mix effect de CLV (S2), maar de balk is negatief: het mix
+        // effect wisselde per kwartaal van teken en woog zwaarder in kwartalen met meer klanten.
+        item = 'the customer mix in some quarters'
+        s3 = 'mix effect (in sommige kwartalen)'
+      } else {
+        item = 'the customer mix'
+        tail = `: ${mixReason(false)}`
+        s3 = 'mix effect'
+      }
     }
+    // Stabiele CLV maar een verlies in value of mix effect: dan compenseerde het andere effect het.
+    const other = worst.k === 'existingCustomerValue' ? i.parts.customerMix : worst.k === 'customerMix' ? i.parts.existingCustomerValue : 0
+    if (dv === 0 && other > 0) {
+      tail += `, offset by ${worst.k === 'existingCustomerValue' ? 'a better customer mix' : 'existing customers becoming more valuable'} (${amount(other)})`
+      s3 += ', gecompenseerd'
+    }
+    sentences.push(`The largest loss came from ${item} (${amount(worst.value)})${tail}.`)
   }
   return { sentences, branches: { s1, s2, r, s3 } }
 }
