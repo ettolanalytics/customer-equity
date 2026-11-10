@@ -1,6 +1,11 @@
-# Haalt elke dag de nieuwe Beanrise-data op via de API (datacontract v1.2) en schrijft ze in
-# ce_private.bz_* (scripts/ingest_beanrise.py). Beanrise publiceert om 02:30 UTC.
-# Alles-of-niets: faalt een stap of controle, dan wordt niets geschreven en mailt GitHub.
+# Elke dag: de nieuwe Beanrise-data ophalen via de API (datacontract v1.2) naar ce_private.bz_*
+# (scripts/ingest_beanrise.py), daarna het sBG-model schatten en de nieuwe cijfers publiceren in
+# ce_public.quarters_v2 (scripts/estimate_sbg.py; nog niet live). Beanrise publiceert om 02:30 UTC.
+# Alles-of-niets per stap: faalt een stap of controle, dan wordt niets geschreven of gepubliceerd
+# en mailt GitHub. Alleen een fit die niet convergeert houdt de publicatie tegen.
+#
+# Validatie (scripts/validate_holdout.py): op de 1e van de maand, of met de hand (validate: true).
+# Een gefaalde validatie laat de run falen (mail), maar de publicatie is dan al gebeurd.
 #
 # Publieke repo, dus publieke logs: de secrets worden gemaskeerd (ook host en wachtwoord los),
 # het script drukt alleen aantallen af, en er worden geen artifacts bewaard.
@@ -13,6 +18,11 @@ on:
   schedule:
     - cron: '15 4 * * *' # dagelijks 04:15 UTC
   workflow_dispatch:
+    inputs:
+      validate:
+        description: 'Ook de holdoutvalidatie draaien'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -54,7 +64,7 @@ jobs:
           python-version: '3.13'
 
       - name: Afhankelijkheden
-        run: python -m pip install --quiet --disable-pip-version-check 'psycopg[binary]==3.2.10'
+        run: python -m pip install --quiet --disable-pip-version-check -r scripts/requirements-ci.txt
 
       - name: Ophalen en laden
         env:
@@ -62,3 +72,57 @@ jobs:
           BEANRISE_API_KEY: ${{ secrets.BEANRISE_API_KEY }}
           CE_LOADER_DB_URL: ${{ secrets.CE_LOADER_DB_URL }}
         run: python scripts/ingest_beanrise.py
+
+      - name: Schatten en publiceren (quarters_v2)
+        env:
+          CE_LOADER_DB_URL: ${{ secrets.CE_LOADER_DB_URL }}
+        run: python scripts/estimate_sbg.py
+
+  validate:
+    needs: ingest
+    if: github.event_name == 'schedule' || inputs.validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Alleen op de 1e van de maand (of met de hand)
+        id: when
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "schedule" ] && [ "$(date -u +%d)" != "01" ]; then
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Secrets maskeren
+        if: steps.when.outputs.run == 'true'
+        env:
+          CE_LOADER_DB_URL: ${{ secrets.CE_LOADER_DB_URL }}
+        run: |
+          python3 - <<'PY'
+          import os
+          from urllib.parse import urlparse
+          u = urlparse(os.environ.get("CE_LOADER_DB_URL", ""))
+          for part in (u.hostname, u.username, u.password, u.netloc):
+              if part and len(part) > 3:
+                  print(f"::add-mask::{part}")
+          PY
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: steps.when.outputs.run == 'true'
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        if: steps.when.outputs.run == 'true'
+        with:
+          python-version: '3.13'
+
+      - name: Afhankelijkheden
+        if: steps.when.outputs.run == 'true'
+        run: python -m pip install --quiet --disable-pip-version-check -r scripts/requirements-ci.txt
+
+      - name: Holdoutvalidatie (V1a, V1b, V2, V3, V4)
+        if: steps.when.outputs.run == 'true'
+        env:
+          CE_LOADER_DB_URL: ${{ secrets.CE_LOADER_DB_URL }}
+        run: python scripts/validate_holdout.py --save

@@ -40,6 +40,8 @@ def parquet_fingerprint():
 
 
 def main():
+    sys.exit("Buiten gebruik sinds 10 nov 2026: de oude facturen zijn leeggemaakt en de oude "
+             "refresh_and_publish() mag niet meer draaien. Data komt via scripts/ingest_beanrise.py.")
     manifest = json.loads((gen.OUT_DIR / "manifest.json").read_text())
     sha = gen.sha256(PART)
     if sha != manifest["sha256"]["invoices"]:

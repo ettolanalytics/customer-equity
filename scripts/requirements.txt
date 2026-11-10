@@ -2,3 +2,5 @@
 #   python3 -m venv .venv && .venv/bin/pip install -r scripts/requirements.txt
 duckdb==2.0.0
 psycopg[binary]==3.2.10
+numpy==2.5.4
+scipy==1.18.1

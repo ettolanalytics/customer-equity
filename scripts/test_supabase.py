@@ -53,6 +53,8 @@ def rest(method, path, profile, body=None):
 
 
 def main():
+    sys.exit("Buiten gebruik sinds 10 nov 2026: de oude facturen zijn leeggemaakt en de oude "
+             "refresh_and_publish() mag niet meer draaien. Data komt via scripts/ingest_beanrise.py.")
     print("Beveiliging via de Data API (publishable key = rol anon)")
     s, b = rest("GET", "quarters?select=seq,label&order=seq", "ce_public")
     check("anon leest ce_public.quarters", s == 200 and len(json.loads(b)) > 0, f"HTTP {s}, {len(json.loads(b)) if s == 200 else b[:80]} rijen")
