@@ -45,10 +45,11 @@ export function lineChart(
   labels: string[],
   series: Series[],
   format: (step: number) => (v: number) => string,
-  { count = 4, ends = false }: { count?: number; ends?: boolean } = {},
+  { count = 4, ends = false, zero = false }: { count?: number; ends?: boolean; zero?: boolean } = {},
 ) {
   const { W, H, L, R, T, B } = box
-  const all = series.flat().filter((v): v is number => v !== null)
+  // zero: de nul altijd binnen het bereik (bijdragen met teken, met zichtbare nullijn).
+  const all = [...series.flat().filter((v): v is number => v !== null), ...(zero ? [0] : [])]
   let mn = Math.min(...all)
   let mx = Math.max(...all)
   const pad = (mx - mn) * 0.08

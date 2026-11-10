@@ -1,5 +1,5 @@
 // Waterfall "Why did customer equity change…?" met toggle Year / Quarter en toelichting
-// per regel, volgens het ontwerp (CLAUDE.md, Verklaring van de verandering).
+// per regel. Proefversie v2: vijf balken (ontwerp v3.4 §9, CLAUDE.md Verklaring van de verandering).
 // Alle bedragen en aantallen komen uit de JSON; hier alleen indeling en plaatsing.
 import { useState } from 'react'
 import { niceTicks, pctOf } from '../../lib/chart'
@@ -21,41 +21,29 @@ function zig(x: number, w: number, y: number) {
   return d
 }
 
-/** Posten van de waterfall met label en toelichting, in vaste volgorde. */
+/** De vijf balken met label en toelichting, in vaste volgorde (ontwerp v3.4 §9). */
 function items(w: Waterfall, mode: Mode): Item[] {
   const p = w.parts
   const c = w.counts
-  const cv = gb.clv(w.avgClvBegin)
-  const span = mode === 'year' ? ' over four quarters' : ''
-  const list: Item[] = [
-    { label: 'New customers', value: p.newCustomers, note: `${gb.num(c.newCustomers)} new customers${span} × ${cv}.` },
-    { label: 'Reacquired customers', value: p.reacquiredCustomers, note: `${gb.num(c.reacquiredCustomers)} reacquired customers${span} × ${cv}.` },
+  const year = mode === 'year'
+  // Kwartaal: × de gemiddelde CLV aan het begin. Jaar: som van vier kwartalen, elk met zijn eigen begin.
+  const atStart = year ? ' over four quarters × the average CLV at the start of each quarter' : ` × ${gb.clv(w.avgClvBegin)} average CLV at the start`
+  const perCustomer = year ? ' over four quarters, × the customers at the end of each quarter' : ` × ${gb.num(w.customersEnd)} customers`
+  return [
+    { label: 'New customers', value: p.newCustomers, note: `${gb.num(c.newCustomers)} new customers${atStart}.` },
+    { label: 'Reacquired customers', value: p.reacquiredCustomers, note: `${gb.num(c.reacquiredCustomers)} reacquired customers${atStart}.` },
+    { label: 'Churn', value: p.churn, note: `${gb.num(c.churn)} customers churned${atStart}.` },
+    {
+      label: 'Customer mix',
+      value: p.customerMix,
+      note: `Average CLV ${gb.signedClv(w.customerMixPerCustomer)} from the customer mix${perCustomer}.`,
+    },
+    {
+      label: 'Existing customer value',
+      value: p.existingCustomerValue,
+      note: `Average CLV ${gb.signedClv(w.existingCustomerValuePerCustomer)} from existing customers${perCustomer}.`,
+    },
   ]
-  if (p.churn !== undefined) {
-    list.push({ label: 'Churn', value: p.churn, note: `${gb.num(c.churn)} customers churned${span} × ${cv}.` })
-  }
-  if (p.expectedChurn !== undefined && c.expectedChurn !== undefined) {
-    list.push({ label: 'Expected churn', value: p.expectedChurn, note: `${gb.num(c.expectedChurn)} customers expected to churn × ${cv}.` })
-  }
-  if (p.churnVsExpected !== undefined && c.churnVsExpected !== undefined && c.expectedChurn !== undefined) {
-    const lower = c.churnVsExpected >= 0
-    list.push({
-      label: lower ? 'Lower churn than expected' : 'Higher churn than expected',
-      value: p.churnVsExpected,
-      note: `${gb.num(Math.abs(c.churnVsExpected))} ${lower ? 'fewer' : 'more'} customers churned than expected (actual ${gb.num(c.churn)}, expected ${gb.num(c.expectedChurn)}) × ${cv}.`,
-    })
-  }
-  list.push({
-    label: p.marginEffect >= 0 ? 'Higher margin per customer' : 'Lower margin per customer',
-    value: p.marginEffect,
-    note: `Margin per customer ${gb.clv(w.marginBegin)} → ${gb.clv(w.marginEnd)} per quarter × ${gb.num(w.customersEnd)} customers.`,
-  })
-  list.push({
-    label: p.retentionEffect >= 0 ? 'Higher retention' : 'Lower retention',
-    value: p.retentionEffect,
-    note: `Retention ${gb.pct(w.retentionBegin)} → ${gb.pct(w.retentionEnd)} per quarter × ${gb.num(w.customersEnd)} customers.`,
-  })
-  return list
 }
 
 export function WaterfallSection({ view }: { view: View }) {

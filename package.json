@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "fetch-data": "node scripts/fetch-quarters.mjs",
+    "fetch-data:v2": "CE_DATA=v2 node scripts/fetch-quarters.mjs",
+    "dev:v2": "CE_DATA=v2 node scripts/fetch-quarters.mjs && vite",
     "prebuild": "node scripts/fetch-quarters.mjs",
     "build": "tsc -b && vite build",
     "lint": "oxlint",

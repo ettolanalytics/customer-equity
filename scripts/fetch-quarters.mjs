@@ -5,6 +5,9 @@
 //
 // Nodig: SUPABASE_URL en SUPABASE_PUBLISHABLE_KEY (Netlify: omgevingsvariabelen;
 // lokaal: .env.local, waar ook de VITE_-namen worden geaccepteerd).
+//
+// Proefversie (branch proef-v2, alleen lokaal): CE_DATA=v2 leest ce_public.quarters_v2 en
+// publication_v2 (sBG-model, nog niet live). Zonder CE_DATA verandert er niets.
 import { existsSync, mkdirSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -12,6 +15,19 @@ import { fileURLToPath } from 'node:url'
 const ROOT = fileURLToPath(new URL('..', import.meta.url))
 const OUT = `${ROOT}src/data/quarters.json`
 const TIMEOUT_MS = 20_000
+const V2 = process.env.CE_DATA === 'v2'
+
+// Sleutels van het type Quarter in de proefversie (ce_public.quarters_v2).
+const QUARTER_KEYS_V2 = [
+  'label', 'activeBegin', 'activeEnd', 'newCustomers', 'reacquiredCustomers', 'acquiredCustomers',
+  'churn', 'churnRate', 'revenueEur', 'customerEquity', 'avgClv', 'avgClvChange', 'customerMix',
+  'existingCustomerValue', 'expectedInvoices', 'marginPerFutureInvoice', 'lateRenewalFactor', 'model',
+  'clvExample', 'equityVsPrevQuarter', 'equityVsYearAgo', 'activeVsPrevQuarter', 'activeVsYearAgo',
+  'avgClvVsPrevQuarter', 'avgClvVsYearAgo', 'newVsPrevQuarter', 'newVsYearAgo', 'reacquiredVsPrevQuarter',
+  'reacquiredVsYearAgo', 'churnVsPrevQuarter', 'churnVsYearAgo', 'churnRateVsPrevQuarter', 'churnRateVsYearAgo',
+  'customerMixVsPrevQuarter', 'customerMixVsYearAgo', 'existingCustomerValueVsPrevQuarter',
+  'existingCustomerValueVsYearAgo', 'yearSummary', 'waterfall', 'yearWaterfall',
+].sort()
 
 // Sleutels van het type Quarter in src/lib/quarters.ts (ook gecontroleerd in SQL).
 const QUARTER_KEYS = [
@@ -63,8 +79,8 @@ async function get(table, query) {
 }
 
 const [pubRows, rows] = await Promise.all([
-  get('publication', 'select=*'),
-  get('quarters', 'select=seq,label,data&order=seq.asc'),
+  get(V2 ? 'publication_v2' : 'publication', 'select=*'),
+  get(V2 ? 'quarters_v2' : 'quarters', 'select=seq,label,data&order=seq.asc'),
 ])
 
 // Controles op wat we binnenkrijgen
@@ -76,12 +92,24 @@ if (rows.length === 0 || rows.length !== p.quarter_count) {
 rows.forEach((r, i) => {
   if (r.seq !== i + 1 || r.data?.label !== r.label) fail(`kwartaal ${r.label}: volgorde of label klopt niet.`)
   const keys = Object.keys(r.data).sort()
-  if (keys.join() !== QUARTER_KEYS.join()) fail(`kwartaal ${r.label}: velden wijken af van het type Quarter.`)
+  if (keys.join() !== (V2 ? QUARTER_KEYS_V2 : QUARTER_KEYS).join()) fail(`kwartaal ${r.label}: velden wijken af van het type Quarter.`)
 })
 if (rows.at(-1).label !== p.last_quarter) fail(`laatste kwartaal ${rows.at(-1).label}, publication zegt ${p.last_quarter}.`)
 if (!rows.some((r) => r.label === p.first_selectable)) fail(`kiesbaar kwartaal ${p.first_selectable} ontbreekt.`)
 
-const out = {
+const out = V2 ? {
+  assumptions: {
+    discountRateYear: Number(p.discount_rate_year),
+    horizonMonths: Number(p.horizon_months),
+    graceDays: Number(p.grace_days),
+    asOf: p.as_of,
+    generatedAt: p.generated_at,
+    firstSelectable: p.first_selectable,
+    lastQuarter: p.last_quarter,
+    plans: p.plans,
+  },
+  quarters: rows.map((r) => r.data),
+} : {
   assumptions: {
     discountRateYear: Number(p.discount_rate_year),
     horizonQuarters: Number(p.horizon_quarters),
@@ -98,4 +126,4 @@ const out = {
 mkdirSync(dirname(OUT), { recursive: true }) // src/data/ bestaat niet in een verse clone
 writeFileSync(`${OUT}.tmp`, JSON.stringify(out, null, 2) + '\n')
 renameSync(`${OUT}.tmp`, OUT)
-console.log(`✓ ${rows.length} kwartalen (${rows[0].label} – ${p.last_quarter}) uit Supabase, gemaakt ${p.generated_at}.`)
+console.log(`✓ ${V2 ? '[v2] ' : ''}${rows.length} kwartalen (${rows[0].label} – ${p.last_quarter}) uit Supabase, gemaakt ${p.generated_at}.`)

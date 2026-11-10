@@ -45,6 +45,14 @@ export const gb = {
       : gbNum(value, axisDecimals(value, step)),
   /** Asopmaak euro per klant, max. 3 cijfers: "€250", "€31.5" */
   axisClv: (step: number) => (value: number) => '€' + gbNum(value, axisDecimals(value, step)),
+  /** Asopmaak euro per klant met teken (Customer mix, Existing customer value): "−€2", "€0", "€5" */
+  axisSignedClv: (step: number) => (value: number) =>
+    (value < -1e-9 ? '−' : '') + '€' + gbNum(Math.abs(value), axisDecimals(Math.abs(value), step)),
+  /** Datum: "2026-11-09" → "9 Nov 2026" */
+  date: (iso: string) =>
+    new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }).format(new Date(iso)),
+  /** Abonnement naar gewicht: 250 → "250 g", 1000 → "1 kg" */
+  plan: (sizeGrams: number) => (sizeGrams >= 1000 && sizeGrams % 1000 === 0 ? `${sizeGrams / 1000} kg` : `${sizeGrams} g`),
   /** Customer equity, één decimaal: 5239362 → "€5.2m" */
   millions: (value: number) => '€' + gbNum(value / 1e6, 1) + 'm',
   /** Bedrag in de antwoordzin: onder een miljoen in duizenden, anders miljoenen: "€56k", "€1.2m" */

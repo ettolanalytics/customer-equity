@@ -2,7 +2,8 @@
 // met zichtbaar label dat het om synthetische demodata gaat (ook in de PDF-export).
 // Kwartaalknop: kiest uit de kwartalen waarvoor het hele scherm gevuld is.
 // Export opent het afdrukvenster voor "Opslaan als PDF".
-import { quarters, selectable } from '../../lib/quarters'
+import { gb } from '../../lib/format'
+import { assumptions, quarters, selectable } from '../../lib/quarters'
 
 type Props = { selected: number; onSelect: (index: number) => void }
 
@@ -24,6 +25,9 @@ export function TopBar({ selected, onSelect }: Props) {
         </div>
       </div>
       <div className="topbar-r">
+        <span className="asof hide-s" title={`Latest data delivered by Beanrise: ${gb.date(assumptions.asOf)}`}>
+          Data as of {gb.date(assumptions.asOf)}
+        </span>
         {/* Uiterlijk van de knop uit het ontwerp, met een onzichtbare keuzelijst erover. */}
         <span className="tbtn qpick">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5c5b56" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">

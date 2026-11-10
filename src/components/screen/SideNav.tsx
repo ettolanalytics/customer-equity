@@ -31,7 +31,7 @@ export function SideNav() {
         </a>
         <a href="#clv">
           <svg {...iconProps}><path d="M4 12h4l3-7 4 14 3-7h2" /></svg>
-          Average CLV
+          CLV
         </a>
         <a href="#change">
           <svg {...iconProps}><path d="M5 20V10M10 20V6M15 20v-8M20 20V4" /></svg>

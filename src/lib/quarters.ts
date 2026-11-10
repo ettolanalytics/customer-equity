@@ -1,19 +1,21 @@
-// Kwartaalcijfers en aannames uit Supabase (ce_public), bij de build opgehaald door
-// scripts/fetch-quarters.mjs. De app rekent niets zelf: alle getallen komen uit dit bestand.
+// Kwartaalcijfers en aannames uit Supabase, bij de build opgehaald door scripts/fetch-quarters.mjs.
+// Proefversie (branch proef-v2): ce_public.quarters_v2 (CE_DATA=v2). De app rekent niets zelf.
 import raw from '../data/quarters.json'
 
 export type Change = { abs: number; pct: number }
 
+/** Antwoordzin: de laatste vier kwartalen. Customer mix + Existing customer value = avgClvChange. */
 export type YearSummary = {
   acquiredCustomers: number
   newCustomers: number
   reacquiredCustomers: number
+  churn: number
   avgClvChange: number
-  churnQuarters: number
-  churnVsExpected: number | null
+  customerMix: number
+  existingCustomerValue: number
 }
 
-/** Waterfall (jaar of kwartaal); alle bedragen en aantallen uit het rekenscript. */
+/** Waterfall met vijf balken (jaar of kwartaal); de balken tellen precies op tot equityChange. */
 export type Waterfall = {
   fromLabel: string
   toLabel: string
@@ -21,37 +23,38 @@ export type Waterfall = {
   equityEnd: number
   equityChange: number
   equityChangePct: number
-  /** Euro-posten; samen precies equityChange. Jaar: churn. Kwartaal: expectedChurn + churnVsExpected. */
   parts: {
     newCustomers: number
     reacquiredCustomers: number
-    churn?: number
-    expectedChurn?: number
-    churnVsExpected?: number
-    marginEffect: number
-    retentionEffect: number
+    churn: number
+    customerMix: number
+    existingCustomerValue: number
   }
   counts: {
     newCustomers: number
     reacquiredCustomers: number
     churn: number
-    expectedChurn?: number
-    churnVsExpected?: number
+    /** Alleen in de kwartaalwaterfall. */
+    stayingCustomers?: number
   }
   customersBegin: number
   customersEnd: number
   avgClvBegin: number
   avgClvEnd: number
-  marginBegin: number
-  marginEnd: number
-  retentionBegin: number
-  retentionEnd: number
+  /** Per klant; in het jaar de som van de vier kwartalen. */
+  customerMixPerCustomer: number
+  existingCustomerValuePerCustomer: number
 }
 
+/** Rekenvoorbeeld: een nieuwe klant op het meest gekozen abonnement van het kwartaal. */
 export type ClvExample = {
-  churnRate: number
-  expectedQuarters: number
-  undiscountedValue: number
+  planId: number
+  sizeGrams: number
+  nextInvoiceChance: number
+  expectedInvoices: number
+  undiscountedInvoices: number
+  marginPerInvoice: number
+  value: number
 }
 
 export type Quarter = {
@@ -62,56 +65,53 @@ export type Quarter = {
   reacquiredCustomers: number
   acquiredCustomers: number
   churn: number
-  expectedChurn: number | null
   churnRate: number
-  expectedChurnRate: number | null
-  churnRateVsExpected: number | null
   revenueEur: number
-  marginPerCustomer: number
-  retention: number
-  retentionQuarters: number
-  avgClv: number
   customerEquity: number
+  avgClv: number
+  /** Verandering van de gemiddelde CLV t.o.v. het begin van het kwartaal = customerMix + existingCustomerValue. */
+  avgClvChange: number
+  customerMix: number
+  existingCustomerValue: number
+  expectedInvoices: number
+  marginPerFutureInvoice: number
+  lateRenewalFactor: number
+  model: { segment: number; alpha: number; beta: number }[]
+  clvExample: ClvExample
   equityVsPrevQuarter: Change | null
   equityVsYearAgo: Change | null
-  acquiredVsPrevQuarter: Change | null
-  acquiredVsYearAgo: Change | null
-  churnRateVsPrevQuarter: number | null
-  churnRateVsYearAgo: number | null
-  avgClvVsPrevQuarter: Change | null
-  avgClvVsYearAgo: Change | null
   activeVsPrevQuarter: Change | null
   activeVsYearAgo: Change | null
+  avgClvVsPrevQuarter: Change | null
+  avgClvVsYearAgo: Change | null
   newVsPrevQuarter: Change | null
   newVsYearAgo: Change | null
   reacquiredVsPrevQuarter: Change | null
   reacquiredVsYearAgo: Change | null
   churnVsPrevQuarter: Change | null
   churnVsYearAgo: Change | null
-  marginVsPrevQuarter: Change | null
-  marginVsYearAgo: Change | null
-  /** Verschil in retentie als fractie (x 100 = procentpunten). */
-  retentionVsPrevQuarter: number | null
-  retentionVsYearAgo: number | null
-  /** Werkelijke min verwachte churn (aantal). */
-  churnVsExpectedCount: number | null
+  churnRateVsPrevQuarter: number | null
+  churnRateVsYearAgo: number | null
+  /** Verschil in euro per klant (bijdragen met teken). */
+  customerMixVsPrevQuarter: number | null
+  customerMixVsYearAgo: number | null
+  existingCustomerValueVsPrevQuarter: number | null
+  existingCustomerValueVsYearAgo: number | null
   yearSummary: YearSummary | null
-  clvExample: ClvExample
   waterfall: Waterfall | null
   yearWaterfall: Waterfall | null
 }
 
-/** Vaste aannames als getallen, voor de teksten op het scherm. */
+/** Vaste aannames en herkomst als getallen, voor de teksten op het scherm. */
 export type Assumptions = {
   discountRateYear: number
-  horizonQuarters: number
+  horizonMonths: number
   graceDays: number
-  priceEur: number
-  costPerInvoiceEur: number
-  marginPerInvoiceEur: number
+  asOf: string
   generatedAt: string
   firstSelectable: string
   lastQuarter: string
+  plans: { planId: number; sizeGrams: number; priceExclVatCents: number; costCents: number }[]
 }
 
 export const assumptions = raw.assumptions as Assumptions

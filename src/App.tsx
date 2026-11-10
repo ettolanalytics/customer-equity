@@ -10,20 +10,18 @@ import { WaterfallSection } from './components/screen/WaterfallSection'
 import { gb } from './lib/format'
 import { defaultIndex, viewFor, type Hover, type View } from './lib/quarters'
 
-const QUARTER_WORDS = ['', 'quarter', 'two quarters', 'three quarters', 'four quarters']
-
 /**
  * Antwoordzin (CLAUDE.md Schermteksten 1 en 7), met het waarom: customer equity =
  * actieve klanten × gemiddelde CLV. Eerst wat er gebeurde, dan welke factor de
- * doorslag gaf, dan elke factor apart, dan churn tegenover verwacht. Alle getallen
- * komen uit de data; hier worden alleen woorden gekozen op teken en grootte.
+ * doorslag gaf, dan elke factor apart. De reden voor de CLV is de grootste van Customer mix
+ * en Existing customer value over de vier kwartalen. Alle getallen komen uit de data; hier
+ * worden alleen woorden gekozen op teken en grootte.
  */
 function answer({ current: c, vsYearLabel }: View): string {
   const y = c.equityVsYearAgo
   const s = c.yearSummary
-  const w = c.yearWaterfall
   const n = c.activeVsYearAgo
-  if (!y || !s || !w || !n) return ''
+  if (!y || !s || !n) return ''
   const equityUp = y.abs >= 0
   const customersUp = n.abs >= 0
   const clvUp = s.avgClvChange >= 0
@@ -35,25 +33,18 @@ function answer({ current: c, vsYearLabel }: View): string {
       : customersUp === equityUp
         ? `the ${base} outweighed the ${clv}`
         : `the ${clv} outweighed the ${base}`
-  const retentionMain = Math.abs(w.parts.retentionEffect) >= Math.abs(w.parts.marginEffect)
-  const clvReason = retentionMain
-    ? `retention ${w.parts.retentionEffect >= 0 ? 'improved' : 'declined'}`
-    : `margin per customer ${w.parts.marginEffect >= 0 ? 'rose' : 'fell'}`
+  const existingMain = Math.abs(s.existingCustomerValue) >= Math.abs(s.customerMix)
+  const clvReason = existingMain
+    ? `existing customers became ${s.existingCustomerValue >= 0 ? 'more' : 'less'} valuable`
+    : 'of the customer mix'
 
-  const parts = [
+  return [
     `Customer equity ${equityUp ? 'grew' : 'fell'} ${gb.eurShort(y.abs)} (${gb.signedPct(y.pct)}) ${vsYearLabel}, because ${why}.`,
     `Over the last four quarters, the customer base ${customersUp ? 'grew' : 'shrank'} by ${gb.num(Math.abs(n.abs))} ` +
       `to ${gb.num(c.activeEnd)}: ${gb.num(s.acquiredCustomers)} customers were acquired ` +
-      `(${gb.num(s.newCustomers)} new, ${gb.num(s.reacquiredCustomers)} reacquired) and ${gb.num(w.counts.churn)} churned.`,
+      `(${gb.num(s.newCustomers)} new, ${gb.num(s.reacquiredCustomers)} reacquired) and ${gb.num(s.churn)} churned.`,
     `Average CLV ${clvUp ? 'rose' : 'fell'} by ${gb.clv(Math.abs(s.avgClvChange))} to ${gb.clv(c.avgClv)}, mainly because ${clvReason}.`,
-  ]
-  if (s.churnVsExpected !== null && s.churnQuarters > 0) {
-    parts.push(
-      `Over the last ${QUARTER_WORDS[s.churnQuarters]}, ${gb.num(Math.abs(s.churnVsExpected))}` +
-        ` ${s.churnVsExpected >= 0 ? 'fewer' : 'more'} customers churned than expected.`,
-    )
-  }
-  return parts.join(' ')
+  ].join(' ')
 }
 
 function App() {

@@ -1,11 +1,12 @@
 // "What drives the value": de twee factoren van customer equity (Active customers,
 // Average CLV) met hun drivers eronder (CLAUDE.md, Opbouw van het scherm).
 // Elke tegel in de stijl van het ontwerp: waarde, vergelijkingen, minigrafiek, hover.
+// Proefversie v2: drivers van de CLV zijn Customer mix en Existing customer value (ontwerp v3.4 §9).
 // Minigrafiek: de laatste drie jaar, één lijn per jaar (YearChart).
 import type { ReactNode } from 'react'
 import type { ChartBox } from '../../lib/chart'
 import { gb } from '../../lib/format'
-import { assumptions as a, hoveredQuarter, QUARTER_AXIS, yearRead, type Change, type Hover, type HoverProps, type Quarter, type View } from '../../lib/quarters'
+import { assumptions as a, QUARTER_AXIS, yearRead, type Change, type Hover, type HoverProps, type Quarter, type View } from '../../lib/quarters'
 import { ChangeLine } from './ChangeLine'
 import { YearChart, YearLegend } from './YearChart'
 
@@ -21,12 +22,11 @@ type Tile = {
   vsYear: ReactNode
   /** Waarde per kwartaal in de minigrafiek (één lijn per jaar). */
   metric: (q: Quarter) => number | null
-  /** Gestippelde lijn voor het gekozen jaar (verwachte churn), met legenda. */
-  dashed?: (q: Quarter) => number | null
-  dashedLabel?: string
   aria: string
   axis: (step: number) => (v: number) => string
-  /** Tekst boven de grafiek bij hover (of altijd, bij churn). */
+  /** Nul in beeld met nullijn (bijdragen met teken). */
+  zero?: boolean
+  /** Tekst boven de grafiek bij hover. */
   read: (hover: Hover | null) => string
 }
 
@@ -37,17 +37,11 @@ function countChange(change: Change | null, label: string, fmt: (v: number) => s
   return <ChangeLine up={up} good={up === goodWhenUp} pill={gb.pct(change.pct)} value={fmt(change.abs)} label={label} />
 }
 
-/** Vergelijking van een fractie in procentpunten. */
-function pointChange(diff: number | null, label: string, goodWhenUp: boolean) {
+/** Vergelijking van een bijdrage met teken (Customer mix, Existing customer value): verschil in euro. */
+function diffChange(diff: number | null, label: string) {
   if (diff === null) return null
   const up = diff >= 0
-  return <ChangeLine up={up} good={up === goodWhenUp} pill={gb.points(diff)} label={label} />
-}
-
-/** Churn: het kwartaal onder de muis, of zonder hover het gekozen kwartaal; met verwacht ("Exp. —" zonder waarde). */
-function churnRead(view: View, hover: Hover | null): string {
-  const q = hoveredQuarter(view, hover) ?? view.current
-  return `${q.label} · ${gb.num(q.churn)} · Exp. ${q.expectedChurn === null ? '—' : gb.num(q.expectedChurn)}`
+  return <ChangeLine up={up} good={up} pill={gb.signedClv(diff)} label={label} />
 }
 
 function tiles(view: View) {
@@ -68,8 +62,8 @@ function tiles(view: View) {
   }
   const clv: Tile = {
     id: 'clv',
-    label: 'Average CLV',
-    tip: 'Average CLV (customer lifetime value): remaining value per current customer. The expected future contribution margin of a current customer, discounted to today. Customer equity ÷ number of active customers.',
+    label: 'CLV',
+    tip: 'Average value of an active customer: the contribution margin we expect from them over the next five years, discounted to today.',
     value: gb.clv(c.avgClv),
     vsQuarter: countChange(c.avgClvVsPrevQuarter, vq, gb.signedClv),
     vsYear: countChange(c.avgClvVsYearAgo, vy, gb.signedClv),
@@ -103,40 +97,40 @@ function tiles(view: View) {
     },
     {
       label: 'Churn',
-      tip: `Churn: customers active at the start of the quarter who left during it (no new subscription within ${a.graceDays} days). Expected churn: based on last year’s churn rate.`,
+      tip: `Churn: customers active at the start of the quarter who left during it (no paid subscription within ${a.graceDays} days).`,
       value: gb.num(c.churn),
       vsQuarter: countChange(c.churnVsPrevQuarter, vq, gb.signedCount, false),
       vsYear: countChange(c.churnVsYearAgo, vy, gb.signedCount, false),
       metric: (q) => q.churn,
-      dashed: (q) => q.expectedChurn,
-      dashedLabel: 'Expected',
-      aria: 'Line chart of actual and expected churn per quarter',
+      aria: 'Line chart of churn per quarter',
       axis: gb.axisCount,
-      read: (h) => churnRead(view, h),
+      read: (h) => hoverText(h, (q) => q.churn, gb.num),
     },
   ]
   const clvDrivers: Tile[] = [
     {
-      label: 'Margin per customer',
-      tip: `Margin per customer: contribution margin (${gb.clv(a.priceEur)} price minus ${gb.clv(a.costPerInvoiceEur)} cost = ${gb.clv(a.marginPerInvoiceEur)} per monthly invoice) per active customer per quarter.`,
-      value: gb.clv(c.marginPerCustomer),
-      vsQuarter: countChange(c.marginVsPrevQuarter, vq, gb.signedClv),
-      vsYear: countChange(c.marginVsYearAgo, vy, gb.signedClv),
-      metric: (q) => q.marginPerCustomer,
-      aria: 'Line chart of margin per customer per quarter',
-      axis: gb.axisClv,
-      read: (h) => hoverText(h, (q) => q.marginPerCustomer, gb.clv),
+      label: 'Customer mix',
+      tip: 'Change in average CLV because different customers joined and left, for example new customers who are not yet expected to stay as long.',
+      value: gb.signedClv(c.customerMix),
+      vsQuarter: diffChange(c.customerMixVsPrevQuarter, vq),
+      vsYear: diffChange(c.customerMixVsYearAgo, vy),
+      metric: (q) => q.customerMix,
+      aria: 'Line chart of the customer mix effect on average CLV per quarter',
+      axis: gb.axisSignedClv,
+      zero: true,
+      read: (h) => hoverText(h, (q) => q.customerMix, gb.signedClv),
     },
     {
-      label: 'Retention (4-quarter average)',
-      tip: 'Average churn of the previous four quarters, used to calculate CLV. Differs from this quarter’s churn.',
-      value: gb.pct(c.retention),
-      vsQuarter: pointChange(c.retentionVsPrevQuarter, vq, true),
-      vsYear: pointChange(c.retentionVsYearAgo, vy, true),
-      metric: (q) => q.retention,
-      aria: 'Line chart of retention per quarter',
-      axis: gb.axisPct,
-      read: (h) => hoverText(h, (q) => q.retention, gb.pct),
+      label: 'Existing customer value',
+      tip: 'Change in average CLV because customers who stayed became more or less valuable, for example by staying longer or changing plans.',
+      value: gb.signedClv(c.existingCustomerValue),
+      vsQuarter: diffChange(c.existingCustomerValueVsPrevQuarter, vq),
+      vsYear: diffChange(c.existingCustomerValueVsYearAgo, vy),
+      metric: (q) => q.existingCustomerValue,
+      aria: 'Line chart of the existing customer value effect on average CLV per quarter',
+      axis: gb.axisSignedClv,
+      zero: true,
+      read: (h) => hoverText(h, (q) => q.existingCustomerValue, gb.signedClv),
     },
   ]
   return { active, clv, activeDrivers, clvDrivers }
@@ -158,22 +152,14 @@ function TileCard({ tile, box, view, hover, setHover }: { tile: Tile; box: Chart
         {tile.vsQuarter}
         {tile.vsYear}
       </div>
-      {tile.dashedLabel && (
-        <div className="legend">
-          <span className="legend-item">
-            <span style={{ width: 14, borderTop: '2px dashed #8a8984' }} />
-            {tile.dashedLabel}
-          </span>
-        </div>
-      )}
       <p className="tile-read">{tile.read(hover)}</p>
       <div style={{ marginTop: 4 }}>
         <YearChart
           box={box}
           view={view}
           value={tile.metric}
-          dashed={tile.dashed}
           axis={tile.axis}
+          zero={tile.zero}
           aria={`${tile.aria}, ${QUARTER_AXIS.join('–')}, one line per year`}
           hover={hover}
           setHover={setHover}
@@ -201,6 +187,9 @@ export function DriverTiles({ view, ...hover }: { view: View } & HoverProps) {
         </div>
         <div className="drivers drivers-2 d-clv" aria-label="Drivers of average CLV">
           {t.clvDrivers.map((d) => card(d, BOX_DRIVER))}
+          <p className="d-sum">
+            Together: {gb.signedClv(view.current.avgClvChange)} change in CLV vs {view.previous.label.split(' ')[0]}
+          </p>
         </div>
       </section>
     </>

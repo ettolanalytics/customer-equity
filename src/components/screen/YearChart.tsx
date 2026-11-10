@@ -18,15 +18,17 @@ type Props = {
   dashed?: Value
   /** Jaartal aan het eind van elke lijn (direct label). Lijndiktes in schermpixels (non-scaling-stroke), dus overal even dik. */
   directLabels?: boolean
+  /** Nul binnen het bereik en een zichtbare nullijn (bijdragen met teken). */
+  zero?: boolean
 } & HoverProps
 
 const valuesOf = (view: View, f: Value) => view.years.map((l) => l.quarters.map((q) => (q ? f(q) : null)))
 
-export function YearChart({ box, view, value, axis, aria, count = 2, strokeWidth = 1.75, dashed, directLabels, hover, setHover }: Props) {
+export function YearChart({ box, view, value, axis, aria, count = 2, strokeWidth = 1.75, dashed, directLabels, zero, hover, setHover }: Props) {
   const lines = valuesOf(view, value)
   const current = view.years.find((l) => l.role === 0)
   const dashedValues = dashed && current ? current.quarters.map((q) => (q ? dashed(q) : null)) : null
-  const ch = lineChart(box, QUARTER_AXIS, dashedValues ? [...lines, dashedValues] : lines, axis, { count })
+  const ch = lineChart(box, QUARTER_AXIS, dashedValues ? [...lines, dashedValues] : lines, axis, { count, zero })
   const pos = hover?.pos ?? view.currentPos
   const role = hover?.role ?? 0
   const bottom = box.H - box.B
@@ -68,6 +70,7 @@ export function YearChart({ box, view, value, axis, aria, count = 2, strokeWidth
         {ch.ticks.map((t) => (
           <line key={t.label + t.y} x1={box.L} x2={box.W - box.R} y1={t.y} y2={t.y} stroke="#eeede8" strokeWidth="1" vectorEffect="non-scaling-stroke" />
         ))}
+        {zero && <line x1={box.L} x2={box.W - box.R} y1={ch.ys(0)} y2={ch.ys(0)} stroke="#a8a7a1" strokeWidth="1" vectorEffect="non-scaling-stroke" />}
         {dashedValues && (
           <path d={ch.paths[lines.length]} fill="none" stroke="#8a8984" strokeWidth={strokeWidth} strokeDasharray="5 4" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
         )}
