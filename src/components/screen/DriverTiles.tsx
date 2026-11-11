@@ -2,6 +2,9 @@
 // Average CLV) met hun drivers eronder (CLAUDE.md, Opbouw van het scherm).
 // Elke tegel in de stijl van het ontwerp: waarde, vergelijkingen, minigrafiek, hover.
 // Proefversie v2: drivers van de CLV zijn Mix effect en Value effect (data: customerMix, existingCustomerValue).
+// Stock tegenover flow (migratie 17): stock-tegels (actieve klanten, CLV) tonen QoQ en YoY; de flows
+// (New, Reacquired, Churn, gebeurtenissen) QoQ en de laatste vier kwartalen tegenover de vier daarvoor;
+// de effecten (Mix, Value) alleen de som over de laatste vier kwartalen. Alle sommen komen uit de data.
 // Minigrafiek: de laatste drie jaar, één lijn per jaar (YearChart).
 import type { ReactNode } from 'react'
 import type { ChartBox } from '../../lib/chart'
@@ -18,8 +21,8 @@ type Tile = {
   label: string
   tip: string
   value: string
-  vsQuarter: ReactNode
-  vsYear: ReactNode
+  /** Vergelijkingsregels onder de waarde. */
+  lines: ReactNode[]
   /** Waarde per kwartaal in de minigrafiek (één lijn per jaar). */
   metric: (q: Quarter) => number | null
   aria: string
@@ -37,11 +40,38 @@ function countChange(change: Change | null, label: string, fmt: (v: number) => s
   return <ChangeLine up={up} good={up === goodWhenUp} pill={gb.pct(change.pct)} value={fmt(change.abs)} label={label} />
 }
 
-/** Vergelijking van een bijdrage met teken (Mix effect, Value effect): verschil in euro. */
-function diffChange(diff: number | null, label: string) {
-  if (diff === null) return null
-  const up = diff >= 0
-  return <ChangeLine up={up} good={up} pill={gb.signedClv(diff)} label={label} />
+const LAST4 = 'Last 4 quarters'
+
+/** Flow: totaal over de laatste vier kwartalen, en de verandering t.o.v. de vier kwartalen daarvoor. */
+function last4Flow(total: number | null, change: Change | null, goodWhenUp = true) {
+  if (total === null) return null
+  const up = change ? change.abs >= 0 : true
+  return (
+    <div className="dl">
+      <span className="v">{gb.num(total)}</span>
+      <span className="k">{LAST4}</span>
+      {change ? (
+        <>
+          <span className={`pill ${up === goodWhenUp ? 'up' : 'dn'}`}>
+            {up ? '▲' : '▼'} {gb.pct(change.pct)}
+          </span>
+          <span className="v">{gb.signedCount(change.abs)}</span>
+          <span className="k">vs prior 4</span>
+        </>
+      ) : null}
+    </div>
+  )
+}
+
+/** Effect (Mix, Value): som over de laatste vier kwartalen, in euro per klant met teken. */
+function last4Effect(total: number | null) {
+  if (total === null) return null
+  return (
+    <div className="dl">
+      <span className="v">{gb.signedClv(total)}</span>
+      <span className="k">{LAST4}</span>
+    </div>
+  )
 }
 
 function tiles(view: View) {
@@ -53,8 +83,7 @@ function tiles(view: View) {
     label: 'Active customers',
     tip: `Active customers: customers with a running subscription, or within ${a.graceDays} days after it expired. Previous quarter + new + reacquired − churn.`,
     value: gb.num(c.activeEnd),
-    vsQuarter: countChange(c.activeVsPrevQuarter, vq, gb.signedCount),
-    vsYear: countChange(c.activeVsYearAgo, vy, gb.signedCount),
+    lines: [countChange(c.activeVsPrevQuarter, vq, gb.signedCount), countChange(c.activeVsYearAgo, vy, gb.signedCount)],
     metric: (q) => q.activeEnd,
     aria: 'Line chart of active customers per quarter',
     axis: gb.axisCount,
@@ -65,8 +94,7 @@ function tiles(view: View) {
     label: 'CLV',
     tip: `Average value of an active customer: the contribution margin we expect from them over the next ${gb.num(a.horizonMonths / 12)} years, in today's euros at ${gb.num(a.discountRateYear * 100)}% per year.`,
     value: gb.clv(c.avgClv),
-    vsQuarter: countChange(c.avgClvVsPrevQuarter, vq, gb.signedClv),
-    vsYear: countChange(c.avgClvVsYearAgo, vy, gb.signedClv),
+    lines: [countChange(c.avgClvVsPrevQuarter, vq, gb.signedClv), countChange(c.avgClvVsYearAgo, vy, gb.signedClv)],
     metric: (q) => q.avgClv,
     aria: 'Line chart of average CLV per customer per quarter',
     axis: gb.axisClv,
@@ -75,10 +103,9 @@ function tiles(view: View) {
   const activeDrivers: Tile[] = [
     {
       label: 'New',
-      tip: 'New: customers whose first paid subscription started in the quarter and who are still active at the end of it.',
+      tip: 'New: first-ever paid subscriptions that started in the quarter. Counted as events, also when the customer left again within the quarter.',
       value: gb.num(c.newCustomers),
-      vsQuarter: countChange(c.newVsPrevQuarter, vq, gb.signedCount),
-      vsYear: countChange(c.newVsYearAgo, vy, gb.signedCount),
+      lines: [countChange(c.newVsPrevQuarter, vq, gb.signedCount), last4Flow(c.newLast4Quarters, c.newLast4VsPrior4)],
       metric: (q) => q.newCustomers,
       aria: 'Line chart of new customers per quarter',
       axis: gb.axisCount,
@@ -86,10 +113,12 @@ function tiles(view: View) {
     },
     {
       label: 'Reacquired',
-      tip: `Customers who churned earlier (more than ${a.graceDays} days without a subscription) and came back.`,
+      tip: `Customers who churned earlier (more than ${a.graceDays} days without a subscription) and came back. Counted as events: a customer can come back more than once.`,
       value: gb.num(c.reacquiredCustomers),
-      vsQuarter: countChange(c.reacquiredVsPrevQuarter, vq, gb.signedCount),
-      vsYear: countChange(c.reacquiredVsYearAgo, vy, gb.signedCount),
+      lines: [
+        countChange(c.reacquiredVsPrevQuarter, vq, gb.signedCount),
+        last4Flow(c.reacquiredLast4Quarters, c.reacquiredLast4VsPrior4),
+      ],
       metric: (q) => q.reacquiredCustomers,
       aria: 'Line chart of reacquired customers per quarter',
       axis: gb.axisCount,
@@ -97,10 +126,12 @@ function tiles(view: View) {
     },
     {
       label: 'Churn',
-      tip: `Churn: customers active at the start of the quarter who left during it (no paid subscription within ${a.graceDays} days).`,
+      tip: `Churn: each time in the quarter that ${a.graceDays} days passed after a subscription ended without a new payment. Counted as events: a customer can churn more than once.`,
       value: gb.num(c.churn),
-      vsQuarter: countChange(c.churnVsPrevQuarter, vq, gb.signedCount, false),
-      vsYear: countChange(c.churnVsYearAgo, vy, gb.signedCount, false),
+      lines: [
+        countChange(c.churnVsPrevQuarter, vq, gb.signedCount, false),
+        last4Flow(c.churnLast4Quarters, c.churnLast4VsPrior4, false),
+      ],
       metric: (q) => q.churn,
       aria: 'Line chart of churn per quarter',
       axis: gb.axisCount,
@@ -110,10 +141,9 @@ function tiles(view: View) {
   const clvDrivers: Tile[] = [
     {
       label: 'Mix effect',
-      tip: 'Change in average CLV because the customers who joined and left were, on average, worth more or less than the ones who stayed.',
+      tip: 'Contribution to the change in average CLV: the customers who joined and left were, on average, worth more or less than the ones who stayed.',
       value: gb.signedClv(c.customerMix),
-      vsQuarter: diffChange(c.customerMixVsPrevQuarter, vq),
-      vsYear: diffChange(c.customerMixVsYearAgo, vy),
+      lines: [last4Effect(c.customerMixLast4Quarters)],
       metric: (q) => q.customerMix,
       aria: 'Line chart of the mix effect on average CLV per quarter',
       axis: gb.axisSignedClv,
@@ -122,10 +152,9 @@ function tiles(view: View) {
     },
     {
       label: 'Value effect',
-      tip: 'Change in average CLV because existing customers became more or less valuable.',
+      tip: 'Contribution to the change in average CLV: existing customers became more or less valuable.',
       value: gb.signedClv(c.existingCustomerValue),
-      vsQuarter: diffChange(c.existingCustomerValueVsPrevQuarter, vq),
-      vsYear: diffChange(c.existingCustomerValueVsYearAgo, vy),
+      lines: [last4Effect(c.existingCustomerValueLast4Quarters)],
       metric: (q) => q.existingCustomerValue,
       aria: 'Line chart of the value effect on average CLV per quarter',
       axis: gb.axisSignedClv,
@@ -149,8 +178,9 @@ function TileCard({ tile, box, view, hover, setHover }: { tile: Tile; box: Chart
       </div>
       <p className="tile-val">{tile.value}</p>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10 }}>
-        {tile.vsQuarter}
-        {tile.vsYear}
+        {tile.lines.map((line, i) => (
+          <div key={i}>{line}</div>
+        ))}
       </div>
       <p className="tile-read">{tile.read(hover)}</p>
       <div style={{ marginTop: 4 }}>

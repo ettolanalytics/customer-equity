@@ -84,19 +84,22 @@ export type Quarter = {
   activeVsYearAgo: Change | null
   avgClvVsPrevQuarter: Change | null
   avgClvVsYearAgo: Change | null
+  /** Flows (gebeurtenissen): vorig kwartaal, en de laatste vier kwartalen tegenover de vier daarvoor. */
   newVsPrevQuarter: Change | null
-  newVsYearAgo: Change | null
   reacquiredVsPrevQuarter: Change | null
-  reacquiredVsYearAgo: Change | null
   churnVsPrevQuarter: Change | null
-  churnVsYearAgo: Change | null
+  newLast4Quarters: number | null
+  reacquiredLast4Quarters: number | null
+  churnLast4Quarters: number | null
+  newLast4VsPrior4: Change | null
+  reacquiredLast4VsPrior4: Change | null
+  churnLast4VsPrior4: Change | null
+  /** Som van het mix en value effect over de laatste vier kwartalen (euro per klant, met teken). */
+  customerMixLast4Quarters: number | null
+  existingCustomerValueLast4Quarters: number | null
+  /** Zuiver churnpercentage (gechurnd uit de beginstand ÷ beginstand); niet op het scherm. */
   churnRateVsPrevQuarter: number | null
   churnRateVsYearAgo: number | null
-  /** Verschil in euro per klant (bijdragen met teken). */
-  customerMixVsPrevQuarter: number | null
-  customerMixVsYearAgo: number | null
-  existingCustomerValueVsPrevQuarter: number | null
-  existingCustomerValueVsYearAgo: number | null
   yearSummary: YearSummary | null
   waterfall: Waterfall | null
   yearWaterfall: Waterfall | null

@@ -23,10 +23,11 @@ const QUARTER_KEYS_V2 = [
   'churn', 'churnRate', 'revenueEur', 'customerEquity', 'avgClv', 'avgClvChange', 'customerMix',
   'existingCustomerValue', 'expectedInvoices', 'marginPerFutureInvoice', 'lateRenewalFactor', 'model',
   'clvExample', 'equityVsPrevQuarter', 'equityVsYearAgo', 'activeVsPrevQuarter', 'activeVsYearAgo',
-  'avgClvVsPrevQuarter', 'avgClvVsYearAgo', 'newVsPrevQuarter', 'newVsYearAgo', 'reacquiredVsPrevQuarter',
-  'reacquiredVsYearAgo', 'churnVsPrevQuarter', 'churnVsYearAgo', 'churnRateVsPrevQuarter', 'churnRateVsYearAgo',
-  'customerMixVsPrevQuarter', 'customerMixVsYearAgo', 'existingCustomerValueVsPrevQuarter',
-  'existingCustomerValueVsYearAgo', 'yearSummary', 'waterfall', 'yearWaterfall',
+  'avgClvVsPrevQuarter', 'avgClvVsYearAgo', 'newVsPrevQuarter', 'reacquiredVsPrevQuarter',
+  'churnVsPrevQuarter', 'newLast4Quarters', 'reacquiredLast4Quarters', 'churnLast4Quarters',
+  'newLast4VsPrior4', 'reacquiredLast4VsPrior4', 'churnLast4VsPrior4', 'customerMixLast4Quarters',
+  'existingCustomerValueLast4Quarters', 'churnRateVsPrevQuarter', 'churnRateVsYearAgo',
+  'yearSummary', 'waterfall', 'yearWaterfall',
 ].sort()
 
 // Sleutels van het type Quarter in src/lib/quarters.ts (ook gecontroleerd in SQL).
