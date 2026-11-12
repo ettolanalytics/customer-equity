@@ -5,10 +5,12 @@ import { yearRead, type Change, type HoverProps, type View } from '../../lib/qua
 import { ChangeLine } from './ChangeLine'
 import { YearChart, YearLegend } from './YearChart'
 
+/** Stock-vergelijking (QoQ, YoY) zoals de tegels Active customers en CLV: % en bedrag.
+ *  Bedrag volgens CLAUDE.md: onder €1m in duizenden ("+€578k"), daarboven in miljoenen ("+€1.8m"). */
 function EquityChange({ change, label }: { change: Change | null; label: string }) {
   if (!change) return null
   const up = change.abs >= 0
-  return <ChangeLine up={up} good={up} pill={gb.pct(change.pct)} value={gb.signedEur(change.abs)} label={label} />
+  return <ChangeLine up={up} good={up} pill={gb.pct(change.pct)} value={gb.signedThousands(change.abs)} label={label} />
 }
 
 export function EquityHero({ view, hover, setHover }: { view: View } & HoverProps) {
