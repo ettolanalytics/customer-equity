@@ -67,6 +67,13 @@ export function MethodSection({ view }: { view: View }) {
           </table>
         </div>
       </div>
+      <p className="method-ex">
+        <span style={{ fontWeight: 600 }}>Stock and flow. </span>
+        Active customers, average CLV and customer equity are stocks: measured on the last day of the quarter. New,
+        reacquired and churn are flows: events during the quarter, so a customer who joins and leaves within one quarter
+        counts once as new and once as churn. Each quarter, new + reacquired − churn equals the change in active
+        customers, and the mix and value effects add up to the change in average CLV.
+      </p>
     </section>
   )
 }
