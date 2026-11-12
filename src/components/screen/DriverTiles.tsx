@@ -4,7 +4,8 @@
 // Proefversie v2: drivers van de CLV zijn Mix effect en Value effect (data: customerMix, existingCustomerValue).
 // Stock tegenover flow (migratie 17): stock-tegels (actieve klanten, CLV) tonen QoQ en YoY; de flows
 // (New, Reacquired, Churn, gebeurtenissen) QoQ en YoY (migratie 19: dit kwartaal t.o.v. hetzelfde
-// kwartaal een jaar eerder); de effecten (Mix, Value) alleen de som over de laatste vier kwartalen.
+// kwartaal een jaar eerder); de effecten (Mix, Value) zoals de CLV-tegel, alleen met het bedrag: QoQ =
+// effect dit kwartaal, YoY = som over de laatste vier kwartalen (bijdragen aan de CLV-verandering).
 // Alle sommen en verschillen komen uit de data.
 // Minigrafiek: de laatste drie jaar, één lijn per jaar (YearChart).
 import type { ReactNode } from 'react'
@@ -41,15 +42,13 @@ function countChange(change: Change | null, label: string, fmt: (v: number) => s
   return <ChangeLine up={up} good={up === goodWhenUp} pill={gb.pct(change.pct)} value={fmt(change.abs)} label={label} />
 }
 
-const LAST4 = 'Last 4 quarters'
-
-/** Effect (Mix, Value): som over de laatste vier kwartalen, in euro per klant met teken. */
-function last4Effect(total: number | null) {
-  if (total === null) return null
+/** Effect (Mix, Value): bijdrage aan de CLV-verandering in euro per klant, met teken; geen percentage. */
+function effectLine(value: number | null, label: string) {
+  if (value === null) return null
   return (
     <div className="dl">
-      <span className="v">{gb.signedClv(total)}</span>
-      <span className="k">{LAST4}</span>
+      <span className="v">{gb.signedClv(value)}</span>
+      <span className="k">{label}</span>
     </div>
   )
 }
@@ -121,9 +120,9 @@ function tiles(view: View) {
   const clvDrivers: Tile[] = [
     {
       label: 'Mix effect',
-      tip: 'Contribution to the change in average CLV: the customers who joined and left were, on average, worth more or less than the ones who stayed.',
+      tip: 'Contribution to the change in average CLV.',
       value: gb.signedClv(c.customerMix),
-      lines: [last4Effect(c.customerMixLast4Quarters)],
+      lines: [effectLine(c.customerMix, vq), effectLine(c.customerMixLast4Quarters, vy)],
       metric: (q) => q.customerMix,
       aria: 'Line chart of the mix effect on average CLV per quarter',
       axis: gb.axisSignedClv,
@@ -132,9 +131,9 @@ function tiles(view: View) {
     },
     {
       label: 'Value effect',
-      tip: 'Contribution to the change in average CLV: existing customers became more or less valuable.',
+      tip: 'Contribution to the change in average CLV.',
       value: gb.signedClv(c.existingCustomerValue),
-      lines: [last4Effect(c.existingCustomerValueLast4Quarters)],
+      lines: [effectLine(c.existingCustomerValue, vq), effectLine(c.existingCustomerValueLast4Quarters, vy)],
       metric: (q) => q.existingCustomerValue,
       aria: 'Line chart of the value effect on average CLV per quarter',
       axis: gb.axisSignedClv,

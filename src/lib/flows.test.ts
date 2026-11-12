@@ -83,6 +83,19 @@ describe('stock en flow sluiten in quarters.json', () => {
     for (const i of selectable) expect(quarters[i].churnVsYearAgo, quarters[i].label).not.toBeNull()
   })
 
+  it('effecttegels: mix + value = CLV QoQ en CLV YoY (binnen 1 cent), voor elk kiesbaar kwartaal', () => {
+    for (const i of selectable) {
+      const q = quarters[i]
+      // QoQ: het effect dit kwartaal
+      expect(Math.abs(q.customerMix + q.existingCustomerValue - q.avgClvVsPrevQuarter!.abs), q.label).toBeLessThanOrEqual(0.01)
+      // YoY: de som van het effect over de laatste vier kwartalen
+      expect(
+        Math.abs(q.customerMixLast4Quarters! + q.existingCustomerValueLast4Quarters! - q.avgClvVsYearAgo!.abs),
+        q.label,
+      ).toBeLessThanOrEqual(0.01)
+    }
+  })
+
   it('de Vs-velden van de effecten zijn weg', () => {
     const gone = ['customerMixVsPrevQuarter', 'customerMixVsYearAgo', 'existingCustomerValueVsPrevQuarter',
       'existingCustomerValueVsYearAgo']
