@@ -3,8 +3,9 @@
 // Elke tegel in de stijl van het ontwerp: waarde, vergelijkingen, minigrafiek, hover.
 // Proefversie v2: drivers van de CLV zijn Mix effect en Value effect (data: customerMix, existingCustomerValue).
 // Stock tegenover flow (migratie 17): stock-tegels (actieve klanten, CLV) tonen QoQ en YoY; de flows
-// (New, Reacquired, Churn, gebeurtenissen) QoQ en de laatste vier kwartalen tegenover de vier daarvoor;
-// de effecten (Mix, Value) alleen de som over de laatste vier kwartalen. Alle sommen komen uit de data.
+// (New, Reacquired, Churn, gebeurtenissen) QoQ en YoY (migratie 19: dit kwartaal t.o.v. hetzelfde
+// kwartaal een jaar eerder); de effecten (Mix, Value) alleen de som over de laatste vier kwartalen.
+// Alle sommen en verschillen komen uit de data.
 // Minigrafiek: de laatste drie jaar, één lijn per jaar (YearChart).
 import type { ReactNode } from 'react'
 import type { ChartBox } from '../../lib/chart'
@@ -41,27 +42,6 @@ function countChange(change: Change | null, label: string, fmt: (v: number) => s
 }
 
 const LAST4 = 'Last 4 quarters'
-
-/** Flow: totaal over de laatste vier kwartalen, en de verandering t.o.v. de vier kwartalen daarvoor. */
-function last4Flow(total: number | null, change: Change | null, goodWhenUp = true) {
-  if (total === null) return null
-  const up = change ? change.abs >= 0 : true
-  return (
-    <div className="dl">
-      <span className="v">{gb.num(total)}</span>
-      <span className="k">{LAST4}</span>
-      {change ? (
-        <>
-          <span className={`pill ${up === goodWhenUp ? 'up' : 'dn'}`}>
-            {up ? '▲' : '▼'} {gb.pct(change.pct)}
-          </span>
-          <span className="v">{gb.signedCount(change.abs)}</span>
-          <span className="k">vs prior 4</span>
-        </>
-      ) : null}
-    </div>
-  )
-}
 
 /** Effect (Mix, Value): som over de laatste vier kwartalen, in euro per klant met teken. */
 function last4Effect(total: number | null) {
@@ -105,7 +85,7 @@ function tiles(view: View) {
       label: 'New',
       tip: 'New: first-ever paid subscriptions that started in the quarter. Counted as events, also when the customer left again within the quarter.',
       value: gb.num(c.newCustomers),
-      lines: [countChange(c.newVsPrevQuarter, vq, gb.signedCount), last4Flow(c.newLast4Quarters, c.newLast4VsPrior4)],
+      lines: [countChange(c.newVsPrevQuarter, vq, gb.signedCount), countChange(c.newVsYearAgo, vy, gb.signedCount)],
       metric: (q) => q.newCustomers,
       aria: 'Line chart of new customers per quarter',
       axis: gb.axisCount,
@@ -117,7 +97,7 @@ function tiles(view: View) {
       value: gb.num(c.reacquiredCustomers),
       lines: [
         countChange(c.reacquiredVsPrevQuarter, vq, gb.signedCount),
-        last4Flow(c.reacquiredLast4Quarters, c.reacquiredLast4VsPrior4),
+        countChange(c.reacquiredVsYearAgo, vy, gb.signedCount),
       ],
       metric: (q) => q.reacquiredCustomers,
       aria: 'Line chart of reacquired customers per quarter',
@@ -130,7 +110,7 @@ function tiles(view: View) {
       value: gb.num(c.churn),
       lines: [
         countChange(c.churnVsPrevQuarter, vq, gb.signedCount, false),
-        last4Flow(c.churnLast4Quarters, c.churnLast4VsPrior4, false),
+        countChange(c.churnVsYearAgo, vy, gb.signedCount, false),
       ],
       metric: (q) => q.churn,
       aria: 'Line chart of churn per quarter',

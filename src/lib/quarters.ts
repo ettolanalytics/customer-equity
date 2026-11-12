@@ -84,10 +84,14 @@ export type Quarter = {
   activeVsYearAgo: Change | null
   avgClvVsPrevQuarter: Change | null
   avgClvVsYearAgo: Change | null
-  /** Flows (gebeurtenissen): vorig kwartaal, en de laatste vier kwartalen tegenover de vier daarvoor. */
+  /** Flows (gebeurtenissen): t.o.v. vorig kwartaal en t.o.v. hetzelfde kwartaal een jaar eerder (op het scherm). */
   newVsPrevQuarter: Change | null
   reacquiredVsPrevQuarter: Change | null
   churnVsPrevQuarter: Change | null
+  newVsYearAgo: Change | null
+  reacquiredVsYearAgo: Change | null
+  churnVsYearAgo: Change | null
+  /** Flows over de laatste vier kwartalen en t.o.v. de vier daarvoor (in de data, niet op het scherm). */
   newLast4Quarters: number | null
   reacquiredLast4Quarters: number | null
   churnLast4Quarters: number | null

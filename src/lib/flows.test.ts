@@ -63,9 +63,29 @@ describe('stock en flow sluiten in quarters.json', () => {
     }
   })
 
-  it('de YoY-velden van de flows en de Vs-velden van de effecten zijn weg', () => {
-    const gone = ['newVsYearAgo', 'reacquiredVsYearAgo', 'churnVsYearAgo', 'customerMixVsPrevQuarter',
-      'customerMixVsYearAgo', 'existingCustomerValueVsPrevQuarter', 'existingCustomerValueVsYearAgo']
+  it('YoY van de flows = dit kwartaal − hetzelfde kwartaal een jaar eerder (migratie 19)', () => {
+    const flows = [
+      ['newCustomers', 'newVsYearAgo'],
+      ['reacquiredCustomers', 'reacquiredVsYearAgo'],
+      ['churn', 'churnVsYearAgo'],
+    ] as const
+    quarters.forEach((q, i) => {
+      for (const [key, yoy] of flows) {
+        if (i < 4) {
+          expect(q[yoy], `${q.label} ${yoy}`).toBeNull()
+          continue
+        }
+        const diff = q[key] - quarters[i - 4][key]
+        expect(q[yoy]!.abs, `${q.label} ${yoy}`).toBe(diff)
+        expect(q[yoy]!.pct, `${q.label} ${yoy}`).toBeCloseTo(diff / quarters[i - 4][key], 5)
+      }
+    })
+    for (const i of selectable) expect(quarters[i].churnVsYearAgo, quarters[i].label).not.toBeNull()
+  })
+
+  it('de Vs-velden van de effecten zijn weg', () => {
+    const gone = ['customerMixVsPrevQuarter', 'customerMixVsYearAgo', 'existingCustomerValueVsPrevQuarter',
+      'existingCustomerValueVsYearAgo']
     for (const q of quarters) for (const k of gone) expect(k in q, `${q.label} ${k}`).toBe(false)
   })
 })

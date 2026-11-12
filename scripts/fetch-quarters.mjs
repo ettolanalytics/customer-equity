@@ -24,7 +24,7 @@ const QUARTER_KEYS_V2 = [
   'existingCustomerValue', 'expectedInvoices', 'marginPerFutureInvoice', 'lateRenewalFactor', 'model',
   'clvExample', 'equityVsPrevQuarter', 'equityVsYearAgo', 'activeVsPrevQuarter', 'activeVsYearAgo',
   'avgClvVsPrevQuarter', 'avgClvVsYearAgo', 'newVsPrevQuarter', 'reacquiredVsPrevQuarter',
-  'churnVsPrevQuarter', 'newLast4Quarters', 'reacquiredLast4Quarters', 'churnLast4Quarters',
+  'churnVsPrevQuarter', 'newVsYearAgo', 'reacquiredVsYearAgo', 'churnVsYearAgo', 'newLast4Quarters', 'reacquiredLast4Quarters', 'churnLast4Quarters',
   'newLast4VsPrior4', 'reacquiredLast4VsPrior4', 'churnLast4VsPrior4', 'customerMixLast4Quarters',
   'existingCustomerValueLast4Quarters', 'churnRateVsPrevQuarter', 'churnRateVsYearAgo',
   'yearSummary', 'waterfall', 'yearWaterfall',
