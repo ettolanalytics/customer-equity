@@ -1,5 +1,5 @@
-// Kaart "What changed average CLV" onder de CLV-tegel: twee blokken (QoQ, YoY) met elk drie
-// horizontale bars (bestaande klanten, wie kwam en ging, totaal). Elk blok een eigen schaal met
+// Kaart "What changed average CLV" onder de CLV-tegel: twee blokken (QoQ, YoY) met elk vier
+// horizontale bars (bestaande klanten, nieuwkomers, vertrekkers, totaal). Elk blok een eigen schaal met
 // nul in beeld; negatieve bars naar links. Kleuren voor positief en negatief zoals in de waterfall;
 // het totaal neutraal. Geen tijdlijn en geen gedeelde hover. Alle bedragen komen uit de data.
 import { clvChangeBlocks, type ClvBlock } from '../../lib/clvChange'
