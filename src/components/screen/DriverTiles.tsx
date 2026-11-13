@@ -50,7 +50,7 @@ function tiles(view: View) {
   const active: Tile = {
     id: 'active',
     label: 'Active customers',
-    tip: `Active customers: customers with a running subscription, or within ${a.graceDays} days after it expired. Previous quarter + new + reacquired − churn.`,
+    tip: `Active customers: customers with a running subscription, or within ${a.graceDays} days after it expired, measured on the last day of the quarter. Previous quarter + new + reacquired − churn.`,
     value: gb.num(c.activeEnd),
     lines: [countChange(c.activeVsPrevQuarter, vq, gb.signedCount), countChange(c.activeVsYearAgo, vy, gb.signedCount)],
     metric: (q) => q.activeEnd,
@@ -61,7 +61,7 @@ function tiles(view: View) {
   const clv: Tile = {
     id: 'clv',
     label: 'CLV',
-    tip: `Average value of an active customer: the contribution margin we expect from them over the next ${gb.num(a.horizonMonths / 12)} years, in today's euros at ${gb.num(a.discountRateYear * 100)}% per year.`,
+    tip: `Average value of an active customer: the contribution margin we expect from them over the next ${gb.num(a.horizonMonths / 12)} years, in today's euros at ${gb.num(a.discountRateYear * 100)}% per year. Measured on the last day of the quarter.`,
     value: gb.clv(c.avgClv),
     lines: [countChange(c.avgClvVsPrevQuarter, vq, gb.signedClv), countChange(c.avgClvVsYearAgo, vy, gb.signedClv)],
     metric: (q) => q.avgClv,
@@ -72,7 +72,7 @@ function tiles(view: View) {
   const activeDrivers: Tile[] = [
     {
       label: 'New',
-      tip: 'New: first-ever paid subscriptions that started in the quarter. Counted as events, also when the customer left again within the quarter.',
+      tip: 'New: first-ever paid subscriptions, counting all events during the quarter, also when the customer left again within the quarter.',
       value: gb.num(c.newCustomers),
       lines: [countChange(c.newVsPrevQuarter, vq, gb.signedCount), countChange(c.newVsYearAgo, vy, gb.signedCount)],
       metric: (q) => q.newCustomers,
@@ -82,7 +82,7 @@ function tiles(view: View) {
     },
     {
       label: 'Reacquired',
-      tip: `Customers who churned earlier (more than ${a.graceDays} days without a subscription) and came back. Counted as events: a customer can come back more than once.`,
+      tip: `Customers who churned earlier (more than ${a.graceDays} days without a subscription) and came back, counting all events during the quarter: a customer can come back more than once.`,
       value: gb.num(c.reacquiredCustomers),
       lines: [
         countChange(c.reacquiredVsPrevQuarter, vq, gb.signedCount),
@@ -95,7 +95,7 @@ function tiles(view: View) {
     },
     {
       label: 'Churn',
-      tip: `Churn: each time in the quarter that ${a.graceDays} days passed after a subscription ended without a new payment. Counted as events: a customer can churn more than once.`,
+      tip: `Churn: each time ${a.graceDays} days passed after a subscription ended without a new payment, counting all events during the quarter: a customer can churn more than once.`,
       value: gb.num(c.churn),
       lines: [
         countChange(c.churnVsPrevQuarter, vq, gb.signedCount, false),

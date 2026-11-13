@@ -1,5 +1,5 @@
-// "Model and assumptions" (proefversie v2): het model in het kort en de aannames als tabel.
-// De definities staan in de tooltips. Alle getallen komen uit de data (quarters_v2, publication_v2).
+// "Model and assumptions" (proefversie v2): het CLV-model in het kort en vier definities als tabel.
+// Het meetmoment (laatste dag of alle gebeurtenissen in het kwartaal) staat in de tooltips. Alle getallen komen uit de data (quarters_v2, publication_v2).
 import { gb } from '../../lib/format'
 import { assumptions as a, type View } from '../../lib/quarters'
 
@@ -34,18 +34,15 @@ export function MethodSection({ view }: { view: View }) {
     `a new ${gb.plan(ex.sizeGrams)} customer renews next month with a ${gb.pct(ex.nextInvoiceChance)} chance. ` +
     `Over ${years} years they are expected to pay ${gb.num(ex.expectedInvoices, 1)} more invoices, counted in today’s euros. ` +
     `At ${gb.clv(ex.marginPerInvoice)} margin per invoice, plus expected plan changes, their CLV is ${gb.clv(ex.value)}.`
+  // Definities: precies vier regels; het meetmoment staat in de tooltips van de tegels.
   const rows: [string, string][] = [
-    ['Horizon', `${years} years (${gb.num(a.horizonMonths)} monthly invoices); nothing after ${years} years counts.`],
-    ['Future margin in today\'s euros', `${pct0(a.discountRateYear)} per year — €1 in ${yearsWord} years counts as ${gb.clv(a.horizonDiscountFactor)} today.`],
-    ['Margin', 'Price minus the cost of each delivery, excluding VAT; averaged over the last 12 months per plan; including expected up- and downgrades.'],
-    ['Active customer', `Running subscription, or within ${a.graceDays} days after it expired.`],
-    [`Customers within those ${a.graceDays} days`, `Count at the share that still renews (${gb.pct(c.lateRenewalFactor)}).`],
     [
-      'When measured',
-      'Active customers, average CLV and customer equity: on the last day of the quarter. New, reacquired and churn: all events during the quarter.',
+      'Customer',
+      `A running subscription, or within ${a.graceDays} days after it expired. Customers within those ${a.graceDays} days count at the share that still renews (${gb.pct(c.lateRenewalFactor)}).`,
     ],
-    ['Acquisition costs', 'Not included.'],
-    ['Change per period', 'New, reacquired and churned customers at the average CLV at the start; mix and value effect × customers at the end; the year adds up four quarters.'],
+    ['Margin', 'Price minus the cost of each delivery, excluding VAT; averaged over the last 12 months per plan; including expected up- and downgrades.'],
+    [`${years} years`, `${gb.num(a.horizonMonths)} monthly invoices; nothing after ${years} years counts.`],
+    ["Today's euros", `${pct0(a.discountRateYear)} per year — €1 in ${yearsWord} years counts as ${gb.clv(a.horizonDiscountFactor)} today.`],
   ]
 
   return (
@@ -70,7 +67,7 @@ export function MethodSection({ view }: { view: View }) {
           <p className="ma-intro">Checked every month against what actually happened next.</p>
         </div>
         <div className="ma-block">
-          <p className="method-title">Assumptions</p>
+          <p className="method-title">Definitions</p>
           <table className="ma-table">
             <tbody>
               {rows.map(([k, v]) => (
