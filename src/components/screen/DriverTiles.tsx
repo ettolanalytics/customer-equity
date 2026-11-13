@@ -50,7 +50,7 @@ function tiles(view: View) {
   const active: Tile = {
     id: 'active',
     label: 'Active customers',
-    tip: `Active customers: customers with a running subscription, or within ${a.graceDays} days after it expired, measured on the last day of the quarter. Previous quarter + new + reacquired − churn.`,
+    tip: `Active customers: customers with a running subscription, or within ${a.graceDays} days after it expired. Previous quarter + new + reacquired − churn. Measured on the last day of the quarter.`,
     value: gb.num(c.activeEnd),
     lines: [countChange(c.activeVsPrevQuarter, vq, gb.signedCount), countChange(c.activeVsYearAgo, vy, gb.signedCount)],
     metric: (q) => q.activeEnd,
@@ -72,7 +72,7 @@ function tiles(view: View) {
   const activeDrivers: Tile[] = [
     {
       label: 'New',
-      tip: 'New: first-ever paid subscriptions, counting all events during the quarter, also when the customer left again within the quarter.',
+      tip: 'New: first-ever paid subscriptions, also when the customer left again within the quarter. Counts all events during the quarter.',
       value: gb.num(c.newCustomers),
       lines: [countChange(c.newVsPrevQuarter, vq, gb.signedCount), countChange(c.newVsYearAgo, vy, gb.signedCount)],
       metric: (q) => q.newCustomers,
@@ -82,7 +82,7 @@ function tiles(view: View) {
     },
     {
       label: 'Reacquired',
-      tip: `Customers who churned earlier (more than ${a.graceDays} days without a subscription) and came back, counting all events during the quarter: a customer can come back more than once.`,
+      tip: `Customers who churned earlier (more than ${a.graceDays} days without a subscription) and came back; a customer can come back more than once. Counts all events during the quarter.`,
       value: gb.num(c.reacquiredCustomers),
       lines: [
         countChange(c.reacquiredVsPrevQuarter, vq, gb.signedCount),
@@ -95,7 +95,7 @@ function tiles(view: View) {
     },
     {
       label: 'Churn',
-      tip: `Churn: each time ${a.graceDays} days passed after a subscription ended without a new payment, counting all events during the quarter: a customer can churn more than once.`,
+      tip: `Churn: each time ${a.graceDays} days passed after a subscription ended without a new payment; a customer can churn more than once. Counts all events during the quarter.`,
       value: gb.num(c.churn),
       lines: [
         countChange(c.churnVsPrevQuarter, vq, gb.signedCount, false),

@@ -25,7 +25,7 @@ export function EquityHero({ view, hover, setHover }: { view: View } & HoverProp
           <span className="tip" style={{ marginLeft: 0 }}>
             <button type="button" className="ib" aria-label="Definition of customer equity">i</button>
             <span className="tt" role="tooltip">
-              Customer equity: the sum of the CLV of all active customers, measured on the last day of the quarter. The expected future contribution margin of your current customers, in today's euros.
+              Customer equity: the sum of the CLV of all active customers. The expected future contribution margin of your current customers, in today's euros. Measured on the last day of the quarter.
             </span>
           </span>
           <span className="period">{current.label}</span>

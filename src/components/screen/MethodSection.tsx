@@ -1,5 +1,6 @@
-// "Model and assumptions" (proefversie v2): het CLV-model in het kort en vier definities als tabel.
-// Het meetmoment (laatste dag of alle gebeurtenissen in het kwartaal) staat in de tooltips. Alle getallen komen uit de data (quarters_v2, publication_v2).
+// "Model and assumptions" (proefversie v2): alleen het blok "CLV model", met de drie onderdelen van de
+// CLV en een rekenvoorbeeld. Het meetmoment (laatste dag of alle gebeurtenissen in het kwartaal) staat
+// in de tooltips. Alle getallen komen uit de data (quarters_v2, publication_v2).
 import { gb } from '../../lib/format'
 import { assumptions as a, type View } from '../../lib/quarters'
 
@@ -19,36 +20,35 @@ export function MethodSection({ view }: { view: View }) {
     ? `fitted per starting plan${returning ? ' and separately for returning customers' : ''}, on all subscriptions up to the quarter`
     : `fitted on all customers together${returning ? ' and separately for returning customers' : ''}, on all subscriptions up to the quarter`
 
-  const intro = `A customer’s CLV is the margin we expect them to bring in over the next ${years} years, counted in today’s euros. It combines three things:`
+  const intro = `A customer's CLV is the margin we expect them to bring in over the next ${years} years, counted in today's euros. It combines three things:`
   const model: [string, string][] = [
     [
       'How long the customer stays.',
       'Every customer has their own chance of cancelling each month, and these chances differ between customers. ' +
         'Customers who cancel easily tend to leave early, so the longer a customer has stayed, the more likely they are to stay. ' +
-        `This is the shifted-beta-geometric model, ${fitted}.`,
+        `This is the shifted-beta-geometric model, ${fitted}. ` +
+        `A customer whose subscription expired less than ${a.graceDays} days ago counts at ${gb.pct(c.lateRenewalFactor)} of their CLV, because that is the share that still renews.`,
     ],
-    ['What each invoice earns.', 'The margin per invoice for the customer’s plan, including expected up- and downgrades.'],
-    ['When it comes in.', `Margin further in the future counts for less: ${pct0(a.discountRateYear)} per year.`],
+    [
+      'What each invoice earns.',
+      'Price minus the cost of each delivery, excluding VAT, averaged over the last 12 months per plan, including expected up- and downgrades. ' +
+        'The cost of acquiring the customer is not included.',
+    ],
+    [
+      'When it comes in.',
+      `Margin further in the future counts for less: ${pct0(a.discountRateYear)} per year, so €1 in ${yearsWord} years counts as ${gb.clv(a.horizonDiscountFactor)} today. ` +
+        `Only the next ${gb.num(a.horizonMonths)} monthly invoices count; nothing after ${years} years.`,
+    ],
   ]
   const example =
     `a new ${gb.plan(ex.sizeGrams)} customer renews next month with a ${gb.pct(ex.nextInvoiceChance)} chance. ` +
-    `Over ${years} years they are expected to pay ${gb.num(ex.expectedInvoices, 1)} more invoices, counted in today’s euros. ` +
+    `Over ${years} years they are expected to pay ${gb.num(ex.expectedInvoices, 1)} more invoices, counted in today's euros. ` +
     `At ${gb.clv(ex.marginPerInvoice)} margin per invoice, plus expected plan changes, their CLV is ${gb.clv(ex.value)}.`
-  // Definities: precies vier regels; het meetmoment staat in de tooltips van de tegels.
-  const rows: [string, string][] = [
-    [
-      'Customer',
-      `A running subscription, or within ${a.graceDays} days after it expired. Customers within those ${a.graceDays} days count at the share that still renews (${gb.pct(c.lateRenewalFactor)}).`,
-    ],
-    ['Margin', 'Price minus the cost of each delivery, excluding VAT; averaged over the last 12 months per plan; including expected up- and downgrades.'],
-    [`${years} years`, `${gb.num(a.horizonMonths)} monthly invoices; nothing after ${years} years counts.`],
-    ["Today's euros", `${pct0(a.discountRateYear)} per year — €1 in ${yearsWord} years counts as ${gb.clv(a.horizonDiscountFactor)} today.`],
-  ]
 
   return (
     <section id="method" className="card section" aria-label="Model and assumptions">
       <h2 className="section-title" style={{ marginBottom: 6 }}>Model and assumptions</h2>
-      <div className="ma">
+      <div className="ma ma-single">
         <div className="ma-block">
           <p className="method-title">CLV model</p>
           <p className="ma-intro">{intro}</p>
@@ -63,21 +63,6 @@ export function MethodSection({ view }: { view: View }) {
             <span style={{ fontWeight: 600 }}>Example: </span>
             {example}
           </p>
-          {/* Voorlopig, tot vaststaat of dit klopt. */}
-          <p className="ma-intro">Checked every month against what actually happened next.</p>
-        </div>
-        <div className="ma-block">
-          <p className="method-title">Definitions</p>
-          <table className="ma-table">
-            <tbody>
-              {rows.map(([k, v]) => (
-                <tr key={k}>
-                  <th scope="row">{k}</th>
-                  <td>{v}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
         </div>
       </div>
     </section>
