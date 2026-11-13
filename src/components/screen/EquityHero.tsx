@@ -31,7 +31,9 @@ export function EquityHero({ view, hover, setHover }: { view: View } & HoverProp
           <span className="period">{current.label}</span>
         </div>
         <p className="hero-val">{gb.millions(current.customerEquity)}</p>
-        <p className="hero-note">Present value of future margin, not revenue.</p>
+        <p className="hero-note">
+          {gb.num(current.activeEnd)} active customers × {gb.clv(current.avgClv)} average CLV
+        </p>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 14 }}>
           <EquityChange change={current.equityVsPrevQuarter} label={vsQuarterLabel} />
           <EquityChange change={current.equityVsYearAgo} label={vsYearLabel} />
@@ -58,9 +60,6 @@ export function EquityHero({ view, hover, setHover }: { view: View } & HoverProp
             setHover={setHover}
           />
         </div>
-        <p className="decomp">
-          {gb.num(current.activeEnd)} active customers × {gb.clv(current.avgClv)} average CLV
-        </p>
       </div>
     </section>
   )
