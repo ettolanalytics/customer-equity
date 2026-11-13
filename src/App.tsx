@@ -8,7 +8,6 @@ import { SideNav } from './components/screen/SideNav'
 import { TopBar } from './components/screen/TopBar'
 import { WaterfallSection } from './components/screen/WaterfallSection'
 import { defaultIndex, viewFor, type Hover } from './lib/quarters'
-import { executiveSummary, summaryInput } from './lib/summary'
 
 function App() {
   // Gedeelde hover over alle grafieken, zoals in het ontwerp.
@@ -17,9 +16,6 @@ function App() {
   const [selected, setSelected] = useState(defaultIndex)
   const view = viewFor(selected)
   const { current } = view
-  // Executive summary: vier zinnen met een vaste opbouw (src/lib/summary.ts).
-  const input = summaryInput(view)
-  const summary = input ? executiveSummary(input) : null
   const select = (i: number) => {
     setHover(null)
     setSelected(i)
@@ -39,14 +35,6 @@ function App() {
                   <p className="subtitle">The value of your current customers · {current.label}</p>
                 </div>
               </div>
-              {summary && (
-                <div className="qa" aria-label="Executive summary">
-                  <p className="qa-q">Executive summary</p>
-                  {summary.sentences.map((s) => (
-                    <p key={s} className="qa-a">{s}</p>
-                  ))}
-                </div>
-              )}
             </div>
             <EquityHero view={view} hover={hover} setHover={setHover} />
             <DriverTiles view={view} hover={hover} setHover={setHover} />
