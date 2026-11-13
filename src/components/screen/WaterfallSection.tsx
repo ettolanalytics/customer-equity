@@ -1,5 +1,5 @@
 // Waterfall "Why did customer equity change…?" met toggle Year / Quarter en toelichting
-// per regel. Proefversie v2: vijf balken (ontwerp v3.4 §9, CLAUDE.md Verklaring van de verandering).
+// per regel. Proefversie v2: vier balken, elke klant tegen zijn eigen CLV (migratie 21).
 // Alle bedragen en aantallen komen uit de JSON; hier alleen indeling en plaatsing.
 import { useState } from 'react'
 import { niceTicks, pctOf } from '../../lib/chart'
@@ -22,27 +22,26 @@ function zig(x: number, w: number, y: number) {
   return d
 }
 
-/** De vijf balken met label en toelichting, in vaste volgorde (ontwerp v3.4 §9). */
+/** De vier balken met label en toelichting, in vaste volgorde. Elke klant telt tegen zijn eigen CLV
+ *  (migratie 21); de aantallen zijn gebeurtenissen, zoals op de tegels. */
 function items(w: Waterfall, mode: Mode): Item[] {
   const p = w.parts
   const c = w.counts
-  const year = mode === 'year'
-  // Kwartaal: × de gemiddelde CLV aan het begin. Jaar: som van vier kwartalen, elk met zijn eigen begin.
-  const atStart = year ? ' over four quarters × the average CLV at the start of each quarter' : ` × ${gb.clv(w.avgClvBegin)} average CLV at the start`
-  const perCustomer = year ? ' over four quarters, × the customers at the end of each quarter' : ` × ${gb.num(w.customersEnd)} customers`
+  const n = (x: number) => gb.num(x)
+  const end = 'each valued at their own CLV at the end of their quarter. Customers who left within the same quarter count as €0.'
+  const start = 'each valued at their own CLV at the start of their quarter. Customers who joined within the same quarter count as €0.'
+  const stayed =
+    mode === 'quarter' && c.stayingCustomers !== undefined
+      ? `${n(c.stayingCustomers)} customers who stayed through the quarter: their CLV at the end minus their CLV at the start.`
+      : 'Customers who stayed through each quarter: their CLV at the end minus their CLV at the start, over four quarters.'
   return [
-    { label: 'New customers', value: p.newCustomers, note: `${gb.num(c.newCustomers)} new customers${atStart}.` },
-    { label: 'Reacquired customers', value: p.reacquiredCustomers, note: `${gb.num(c.reacquiredCustomers)} reacquired customers${atStart}.` },
-    { label: 'Churn', value: p.churn, note: `${gb.num(c.churn)} customers churned${atStart}.` },
+    { label: 'New customers', value: p.newCustomers, note: `${n(c.newCustomers)} new customers, ${end}` },
+    { label: 'Reacquired customers', value: p.reacquiredCustomers, note: `${n(c.reacquiredCustomers)} reacquired customers, ${end}` },
+    { label: 'Churn', value: p.churn, note: `${n(c.churn)} customers who left, ${start}` },
     {
-      label: 'Mix effect',
-      value: p.customerMix,
-      note: `Average CLV ${gb.signedClv(w.customerMixPerCustomer)} from the mix effect${perCustomer}.`,
-    },
-    {
-      label: 'Value effect',
+      label: `Existing customers became ${p.existingCustomerValue >= 0 ? 'more' : 'less'} valuable`,
       value: p.existingCustomerValue,
-      note: `Average CLV ${gb.signedClv(w.existingCustomerValuePerCustomer)} from the value effect${perCustomer}.`,
+      note: stayed,
     },
   ]
 }

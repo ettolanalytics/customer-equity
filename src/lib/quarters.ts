@@ -15,7 +15,8 @@ export type YearSummary = {
   existingCustomerValue: number
 }
 
-/** Waterfall met vijf balken (jaar of kwartaal); de balken tellen precies op tot equityChange. */
+/** Waterfall met vier balken (jaar of kwartaal), elke klant tegen zijn eigen CLV (migratie 21);
+ *  de balken tellen precies op tot equityChange. Aantallen zijn gebeurtenissen, zoals op de tegels. */
 export type Waterfall = {
   fromLabel: string
   toLabel: string
@@ -27,7 +28,6 @@ export type Waterfall = {
     newCustomers: number
     reacquiredCustomers: number
     churn: number
-    customerMix: number
     existingCustomerValue: number
   }
   counts: {
@@ -41,9 +41,6 @@ export type Waterfall = {
   customersEnd: number
   avgClvBegin: number
   avgClvEnd: number
-  /** Per klant; in het jaar de som van de vier kwartalen. */
-  customerMixPerCustomer: number
-  existingCustomerValuePerCustomer: number
 }
 
 /** Rekenvoorbeeld: een nieuwe klant op het meest gekozen abonnement van het kwartaal. */
