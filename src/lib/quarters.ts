@@ -101,6 +101,11 @@ export type Quarter = {
   /** Som van het mix en value effect over de laatste vier kwartalen (euro per klant, met teken). */
   customerMixLast4Quarters: number | null
   existingCustomerValueLast4Quarters: number | null
+  /** Mix effect in twee delen (migratie 20): nieuwkomers en vertrekkers t.o.v. de blijvers; samen = customerMix. */
+  customerMixNewcomers: number
+  customerMixLeavers: number
+  customerMixNewcomersLast4Quarters: number | null
+  customerMixLeaversLast4Quarters: number | null
   /** Zuiver churnpercentage (gechurnd uit de beginstand ÷ beginstand); niet op het scherm. */
   churnRateVsPrevQuarter: number | null
   churnRateVsYearAgo: number | null

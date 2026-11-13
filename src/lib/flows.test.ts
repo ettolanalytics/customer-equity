@@ -96,6 +96,20 @@ describe('stock en flow sluiten in quarters.json', () => {
     }
   })
 
+  it('mix effect = nieuwkomers + vertrekkers, per kwartaal en over vier kwartalen (migratie 20)', () => {
+    quarters.forEach((q) => {
+      expect(Math.abs(q.customerMixNewcomers + q.customerMixLeavers - q.customerMix), q.label).toBeLessThan(1e-9)
+      if (q.customerMixLast4Quarters === null) {
+        expect(q.customerMixNewcomersLast4Quarters, q.label).toBeNull()
+        return
+      }
+      expect(
+        Math.abs(q.customerMixNewcomersLast4Quarters! + q.customerMixLeaversLast4Quarters! - q.customerMixLast4Quarters),
+        q.label,
+      ).toBeLessThanOrEqual(0.01)
+    })
+  })
+
   it('de Vs-velden van de effecten zijn weg', () => {
     const gone = ['customerMixVsPrevQuarter', 'customerMixVsYearAgo', 'existingCustomerValueVsPrevQuarter',
       'existingCustomerValueVsYearAgo']
