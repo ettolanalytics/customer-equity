@@ -4,8 +4,8 @@
 // Proefversie v2: drivers van de CLV zijn Mix effect en Value effect (data: customerMix, existingCustomerValue).
 // Stock tegenover flow (migratie 17): stock-tegels (actieve klanten, CLV) tonen QoQ en YoY; de flows
 // (New, Reacquired, Churn, gebeurtenissen) QoQ en YoY (migratie 19: dit kwartaal t.o.v. hetzelfde
-// kwartaal een jaar eerder); de effecten (Mix, Value) zoals de CLV-tegel, alleen met het bedrag: QoQ =
-// effect dit kwartaal, YoY = som over de laatste vier kwartalen (bijdragen aan de CLV-verandering).
+// kwartaal een jaar eerder). Onder de CLV-tegel de kaart "What changed average CLV" (ClvChangeCard):
+// bars voor bestaande klanten, wie kwam en ging en het totaal, QoQ en YoY; geen minigrafiek.
 // Alle sommen en verschillen komen uit de data.
 // Minigrafiek: de laatste drie jaar, één lijn per jaar (YearChart).
 import type { ReactNode } from 'react'
@@ -13,6 +13,7 @@ import type { ChartBox } from '../../lib/chart'
 import { gb } from '../../lib/format'
 import { assumptions as a, QUARTER_AXIS, yearRead, type Change, type Hover, type HoverProps, type Quarter, type View } from '../../lib/quarters'
 import { ChangeLine } from './ChangeLine'
+import { ClvChangeCard } from './ClvChangeCard'
 import { YearChart, YearLegend } from './YearChart'
 
 const BOX_FACTOR: ChartBox = { W: 600, H: 120, L: 56, R: 8, T: 6, B: 22 }
@@ -40,17 +41,6 @@ function countChange(change: Change | null, label: string, fmt: (v: number) => s
   if (!change) return null
   const up = change.abs >= 0
   return <ChangeLine up={up} good={up === goodWhenUp} pill={gb.pct(change.pct)} value={fmt(change.abs)} label={label} />
-}
-
-/** Effect (Mix, Value): bijdrage aan de CLV-verandering in euro per klant, met teken; geen percentage. */
-function effectLine(value: number | null, label: string) {
-  if (value === null) return null
-  return (
-    <div className="dl">
-      <span className="v">{gb.signedClv(value)}</span>
-      <span className="k">{label}</span>
-    </div>
-  )
 }
 
 function tiles(view: View) {
@@ -117,31 +107,7 @@ function tiles(view: View) {
       read: (h) => hoverText(h, (q) => q.churn, gb.num),
     },
   ]
-  const clvDrivers: Tile[] = [
-    {
-      label: 'Mix effect',
-      tip: 'Contribution to the change in average CLV.',
-      value: gb.signedClv(c.customerMix),
-      lines: [effectLine(c.customerMix, vq), effectLine(c.customerMixLast4Quarters, vy)],
-      metric: (q) => q.customerMix,
-      aria: 'Line chart of the mix effect on average CLV per quarter',
-      axis: gb.axisSignedClv,
-      zero: true,
-      read: (h) => hoverText(h, (q) => q.customerMix, gb.signedClv),
-    },
-    {
-      label: 'Value effect',
-      tip: 'Contribution to the change in average CLV.',
-      value: gb.signedClv(c.existingCustomerValue),
-      lines: [effectLine(c.existingCustomerValue, vq), effectLine(c.existingCustomerValueLast4Quarters, vy)],
-      metric: (q) => q.existingCustomerValue,
-      aria: 'Line chart of the value effect on average CLV per quarter',
-      axis: gb.axisSignedClv,
-      zero: true,
-      read: (h) => hoverText(h, (q) => q.existingCustomerValue, gb.signedClv),
-    },
-  ]
-  return { active, clv, activeDrivers, clvDrivers }
+  return { active, clv, activeDrivers }
 }
 
 function TileCard({ tile, box, view, hover, setHover }: { tile: Tile; box: ChartBox; view: View } & HoverProps) {
@@ -194,8 +160,8 @@ export function DriverTiles({ view, ...hover }: { view: View } & HoverProps) {
         <div className="drivers drivers-3 d-active" aria-label="Drivers of active customers">
           {t.activeDrivers.map((d) => card(d, BOX_DRIVER))}
         </div>
-        <div className="drivers drivers-2 d-clv" aria-label="Drivers of average CLV">
-          {t.clvDrivers.map((d) => card(d, BOX_DRIVER))}
+        <div className="drivers d-clv" aria-label="What changed average CLV">
+          <ClvChangeCard view={view} />
         </div>
       </section>
     </>

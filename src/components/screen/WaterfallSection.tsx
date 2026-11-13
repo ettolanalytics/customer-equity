@@ -7,8 +7,9 @@ import { gb, quarterShort } from '../../lib/format'
 import type { View, Waterfall } from '../../lib/quarters'
 
 const C_TOT = '#2a78d6'
-const C_UP = '#1baf7a'
-const C_DN = '#eb6834'
+/** Positief en negatief; ook gebruikt in de kaart "What changed average CLV". */
+export const C_UP = '#1baf7a'
+export const C_DN = '#eb6834'
 const WL = 64, WR = 12, WT = 52, WB = 50, WH = 300, WW = 640
 
 type Mode = 'year' | 'quarter'
