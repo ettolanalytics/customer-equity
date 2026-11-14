@@ -30,33 +30,15 @@ function items(w: Waterfall, mode: Mode): Item[] {
   const p = w.parts
   const c = w.counts
   const n = (x: number) => gb.num(x)
-  const existingLabel = `Existing customers became ${p.existingCustomerValue >= 0 ? 'more' : 'less'} valuable`
-  if (mode === 'year') {
-    return [
-      { label: 'New customers', value: p.newCustomers, note: `${n(c.newCustomers)} customers now who were not customers a year ago, valued at their CLV now.` },
-      {
-        label: 'Reacquired customers',
-        value: p.reacquiredCustomers,
-        note: `${n(c.reacquiredCustomers)} customers now who had been customers before, but not a year ago, valued at their CLV now.`,
-      },
-      { label: 'Churn', value: p.churn, note: `${n(c.churn)} customers a year ago who are not customers now, valued at their CLV a year ago.` },
-      {
-        label: existingLabel,
-        value: p.existingCustomerValue,
-        note: `${n(c.stayingCustomers ?? 0)} customers both now and a year ago: their CLV now minus their CLV a year ago.`,
-      },
-    ]
-  }
-  const end = 'each valued at their own CLV at the end of their quarter. Customers who left within the same quarter count as €0.'
-  const start = 'each valued at their own CLV at the start of their quarter. Customers who joined within the same quarter count as €0.'
+  const when = mode === 'year' ? 'a year ago' : 'at the start of the quarter'
   return [
-    { label: 'New customers', value: p.newCustomers, note: `${n(c.newCustomers)} new customers, ${end}` },
-    { label: 'Reacquired customers', value: p.reacquiredCustomers, note: `${n(c.reacquiredCustomers)} reacquired customers, ${end}` },
-    { label: 'Churn', value: p.churn, note: `${n(c.churn)} customers who left, ${start}` },
+    { label: 'New customers', value: p.newCustomers, note: `Total CLV of ${n(c.newCustomers)} new customers` },
+    { label: 'Reacquired customers', value: p.reacquiredCustomers, note: `Total CLV of ${n(c.reacquiredCustomers)} returning customers` },
+    { label: 'Churn', value: p.churn, note: `Total CLV of ${n(c.churn)} customers who left, ${when}` },
     {
-      label: existingLabel,
+      label: `Existing customers became ${p.existingCustomerValue >= 0 ? 'more' : 'less'} valuable`,
       value: p.existingCustomerValue,
-      note: `${n(c.stayingCustomers ?? 0)} customers who stayed through the quarter: their CLV at the end minus their CLV at the start.`,
+      note: `Change in total CLV of ${n(c.stayingCustomers ?? 0)} existing customers`,
     },
   ]
 }
@@ -144,7 +126,7 @@ export function WaterfallSection({ view }: { view: View }) {
           <span className="wf-swatch" style={{ background: fill }} />
           <span style={{ minWidth: 0 }}>{i.label}</span>
         </span>
-        <span className="wf-row-val">{gb.signedEur(i.value)}</span>
+        <span className="wf-row-val">{gb.signedThousands(i.value)}</span>
       </div>
       <p className="wf-note">{i.note}</p>
     </div>
@@ -231,12 +213,12 @@ export function WaterfallSection({ view }: { view: View }) {
           ))}
         </div>
         <div className="wf-rows">
-          {totalRow('Start ' + w.fromLabel, w.equityBegin, `${gb.num(w.customersBegin)} active customers × ${gb.clv(w.avgClvBegin)} average CLV.`)}
+          {totalRow('Start ' + w.fromLabel, w.equityBegin, `Total CLV of ${gb.num(w.customersBegin)} active customers`)}
           {added.length > 0 && <p className="wf-glabel">Added</p>}
           {added.map((i) => row(i, C_UP))}
           {lost.length > 0 && <p className="wf-glabel">Lost</p>}
           {lost.map((i) => row(i, C_DN))}
-          {totalRow('End ' + w.toLabel, w.equityEnd, `${gb.num(w.customersEnd)} active customers × ${gb.clv(w.avgClvEnd)} average CLV.`)}
+          {totalRow('End ' + w.toLabel, w.equityEnd, `Total CLV of ${gb.num(w.customersEnd)} active customers`)}
         </div>
       </div>
     </section>
