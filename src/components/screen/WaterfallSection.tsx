@@ -34,7 +34,7 @@ function items(w: Waterfall, mode: Mode): Item[] {
   return [
     { label: 'New customers', value: p.newCustomers, note: `Total CLV of ${n(c.newCustomers)} new customers` },
     { label: 'Reacquired customers', value: p.reacquiredCustomers, note: `Total CLV of ${n(c.reacquiredCustomers)} returning customers` },
-    { label: 'Churn', value: p.churn, note: `Total CLV of ${n(c.churn)} customers who left, ${when}` },
+    { label: 'Churn', value: p.churn, note: `Total CLV ${when} of ${n(c.churn)} customers who left` },
     {
       label: `Existing customers became ${p.existingCustomerValue >= 0 ? 'more' : 'less'} valuable`,
       value: p.existingCustomerValue,
