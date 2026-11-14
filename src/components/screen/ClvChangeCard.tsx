@@ -18,7 +18,7 @@ function Block({ block }: { block: ClvBlock }) {
   return (
     <div className="cc-block" aria-label={`Change in average CLV, ${block.title} ${block.vs}`}>
       <p className="cc-head">
-        <span className="cc-title">{block.title}</span> <span className="cc-vs">{block.vs}</span>
+        <span className="cc-title">{block.title}</span>
       </p>
       {block.bars.map((b) => {
         const w = (Math.abs(b.value) / span) * 100
