@@ -22,26 +22,41 @@ function zig(x: number, w: number, y: number) {
   return d
 }
 
-/** De vier balken met label en toelichting, in vaste volgorde. Elke klant telt tegen zijn eigen CLV
- *  (migratie 21); de aantallen zijn gebeurtenissen, zoals op de tegels. */
+/** De vier balken met label en toelichting, in vaste volgorde. Elke klant telt tegen zijn eigen CLV.
+ *  Kwartaal (migratie 21): begin → eind kwartaal; aantallen zijn de gebeurtenissen van de tegels.
+ *  Jaar (migratie 22): foto tegen foto, eind zelfde kwartaal vorig jaar → eind gekozen kwartaal;
+ *  aantallen zijn netto (wie tussendoor kwam en ging komt niet voor). */
 function items(w: Waterfall, mode: Mode): Item[] {
   const p = w.parts
   const c = w.counts
   const n = (x: number) => gb.num(x)
+  const existingLabel = `Existing customers became ${p.existingCustomerValue >= 0 ? 'more' : 'less'} valuable`
+  if (mode === 'year') {
+    return [
+      { label: 'New customers', value: p.newCustomers, note: `${n(c.newCustomers)} customers now who were not customers a year ago, valued at their CLV now.` },
+      {
+        label: 'Reacquired customers',
+        value: p.reacquiredCustomers,
+        note: `${n(c.reacquiredCustomers)} customers now who had been customers before, but not a year ago, valued at their CLV now.`,
+      },
+      { label: 'Churn', value: p.churn, note: `${n(c.churn)} customers a year ago who are not customers now, valued at their CLV a year ago.` },
+      {
+        label: existingLabel,
+        value: p.existingCustomerValue,
+        note: `${n(c.stayingCustomers ?? 0)} customers both now and a year ago: their CLV now minus their CLV a year ago.`,
+      },
+    ]
+  }
   const end = 'each valued at their own CLV at the end of their quarter. Customers who left within the same quarter count as €0.'
   const start = 'each valued at their own CLV at the start of their quarter. Customers who joined within the same quarter count as €0.'
-  const stayed =
-    mode === 'quarter' && c.stayingCustomers !== undefined
-      ? `${n(c.stayingCustomers)} customers who stayed through the quarter: their CLV at the end minus their CLV at the start.`
-      : 'Customers who stayed through each quarter: their CLV at the end minus their CLV at the start, over four quarters.'
   return [
     { label: 'New customers', value: p.newCustomers, note: `${n(c.newCustomers)} new customers, ${end}` },
     { label: 'Reacquired customers', value: p.reacquiredCustomers, note: `${n(c.reacquiredCustomers)} reacquired customers, ${end}` },
     { label: 'Churn', value: p.churn, note: `${n(c.churn)} customers who left, ${start}` },
     {
-      label: `Existing customers became ${p.existingCustomerValue >= 0 ? 'more' : 'less'} valuable`,
+      label: existingLabel,
       value: p.existingCustomerValue,
-      note: stayed,
+      note: `${n(c.stayingCustomers ?? 0)} customers who stayed through the quarter: their CLV at the end minus their CLV at the start.`,
     },
   ]
 }

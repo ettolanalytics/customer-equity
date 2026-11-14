@@ -54,15 +54,6 @@ describe('stock en flow sluiten in quarters.json', () => {
     }
   })
 
-  it('de jaarwaterfall telt dezelfde gebeurtenissen als de tegels', () => {
-    for (const i of selectable) {
-      const q = quarters[i]
-      expect(q.yearWaterfall!.counts.newCustomers, q.label).toBe(q.newLast4Quarters)
-      expect(q.yearWaterfall!.counts.reacquiredCustomers, q.label).toBe(q.reacquiredLast4Quarters)
-      expect(q.yearWaterfall!.counts.churn, q.label).toBe(q.churnLast4Quarters)
-    }
-  })
-
   it('YoY van de flows = dit kwartaal − hetzelfde kwartaal een jaar eerder (migratie 19)', () => {
     const flows = [
       ['newCustomers', 'newVsYearAgo'],
