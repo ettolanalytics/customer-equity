@@ -5,7 +5,7 @@ import { yearRead, type Change, type HoverProps, type View } from '../../lib/qua
 import { ChangeLine } from './ChangeLine'
 import { YearChart, YearLegend } from './YearChart'
 
-/** Stock-vergelijking (QoQ, YoY) zoals de tegels Active customers en CLV: % en bedrag.
+/** Stock-vergelijking (QoQ, YoY) zoals de tegels Active customers en Average CLV: % en bedrag.
  *  Bedrag volgens CLAUDE.md: onder €1m in duizenden ("+€578k"), daarboven in miljoenen ("+€1.8m"). */
 function EquityChange({ change, label }: { change: Change | null; label: string }) {
   if (!change) return null
@@ -25,7 +25,7 @@ export function EquityHero({ view, hover, setHover }: { view: View } & HoverProp
           <span className="tip" style={{ marginLeft: 0 }}>
             <button type="button" className="ib" aria-label="Definition of customer equity">i</button>
             <span className="tt" role="tooltip">
-              Customer equity: the sum of the CLV of all active customers. The expected future contribution margin of your current customers, in today's euros. Measured on the last day of the quarter.
+              Customer equity: the sum of the CLV of all active customers. The expected future margin of your current customers, in today's euros. Measured on the last day of the quarter.
             </span>
           </span>
           <span className="period">{current.label}</span>

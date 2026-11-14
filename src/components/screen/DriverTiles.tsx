@@ -60,8 +60,8 @@ function tiles(view: View) {
   }
   const clv: Tile = {
     id: 'clv',
-    label: 'CLV',
-    tip: `Average value of an active customer: the contribution margin we expect from them over the next ${gb.num(a.horizonMonths / 12)} years, in today's euros at ${gb.num(a.discountRateYear * 100)}% per year. Measured on the last day of the quarter.`,
+    label: 'Average CLV',
+    tip: `Average value of an active customer: the margin we expect from them over the next ${gb.num(a.horizonMonths / 12)} years, in today's euros at ${gb.num(a.discountRateYear * 100)}% per year. Measured on the last day of the quarter.`,
     value: gb.clv(c.avgClv),
     lines: [countChange(c.avgClvVsPrevQuarter, vq, gb.signedClv), countChange(c.avgClvVsYearAgo, vy, gb.signedClv)],
     metric: (q) => q.avgClv,
@@ -82,7 +82,7 @@ function tiles(view: View) {
     },
     {
       label: 'Reacquired',
-      tip: `Customers who churned earlier (more than ${a.graceDays} days without a subscription) and came back; a customer can come back more than once. Counts all events during the quarter.`,
+      tip: `Reacquired: customers who churned earlier (more than ${a.graceDays} days without a subscription) and came back; a customer can come back more than once. Counts all events during the quarter.`,
       value: gb.num(c.reacquiredCustomers),
       lines: [
         countChange(c.reacquiredVsPrevQuarter, vq, gb.signedCount),

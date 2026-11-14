@@ -36,7 +36,7 @@ export function SideNav() {
             <circle cx="16" cy="7" r="2" />
             <circle cx="10" cy="17" r="2" />
           </svg>
-          Model and assumptions
+          Explanation of CLV model
         </a>
       </nav>
     </aside>

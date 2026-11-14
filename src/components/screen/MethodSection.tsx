@@ -1,4 +1,4 @@
-// "Model and assumptions" (proefversie v2): alleen het blok "CLV model", met de drie onderdelen van de
+// "Explanation of CLV model" (proefversie v2): uitleg van het CLV-model, met de drie onderdelen van de
 // CLV en een rekenvoorbeeld. Het meetmoment (laatste dag of alle gebeurtenissen in het kwartaal) staat
 // in de tooltips. Alle getallen komen uit de data (quarters_v2, publication_v2).
 import { gb } from '../../lib/format'
@@ -46,11 +46,10 @@ export function MethodSection({ view }: { view: View }) {
     `At ${gb.clv(ex.marginPerInvoice)} margin per invoice, plus expected plan changes, their CLV is ${gb.clv(ex.value)}.`
 
   return (
-    <section id="method" className="card section" aria-label="Model and assumptions">
-      <h2 className="section-title" style={{ marginBottom: 6 }}>Model and assumptions</h2>
+    <section id="method" className="card section" aria-label="Explanation of CLV model">
+      <h2 className="section-title" style={{ marginBottom: 6 }}>Explanation of CLV model</h2>
       <div className="ma ma-single">
         <div className="ma-block">
-          <p className="method-title">CLV model</p>
           <p className="ma-intro">{intro}</p>
           <ol className="ma-list">
             {model.map(([head, text]) => (
