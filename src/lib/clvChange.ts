@@ -1,20 +1,35 @@
-// Kaart "What changed average CLV": per blok (QoQ, YoY) vier bars uit de data, zonder te rekenen.
+// Kaart "What changed average CLV": per blok (QoQ, YoY) drie bars uit de data.
 // Beide blokken foto tegen foto: QoQ begin → eind kwartaal, YoY eind zelfde kwartaal vorig jaar → nu
 // (migratie 23).
 //   1. bestaande klanten: existingCustomerValue (QoQ), existingCustomerValueYoY (YoY);
-//   2. nieuwkomers t.o.v. de blijvers: customerMixNewcomers (QoQ), customerMixNewcomersYoY (YoY);
-//   3. vertrekkers t.o.v. de blijvers: customerMixLeavers (QoQ), customerMixLeaversYoY (YoY).
-//      Positief = vertrekkers waren MINDER waard (hun vertrek verhoogde de gemiddelde CLV);
-//   4. totaal: de CLV-verandering van de CLV-tegel (avgClvVsPrevQuarter.abs, avgClvVsYearAgo.abs).
-// Bar 1 + 2 + 3 = bar 4 (getoetst in clvChange.test.ts); 2 + 3 = het mix effect (migratie 20).
+//   2. Customer mix = nieuwkomers + vertrekkers t.o.v. de blijvers: customerMixNewcomers + customerMixLeavers
+//      (QoQ, samen = customerMix), customerMixNewcomersYoY + customerMixLeaversYoY (YoY). De twee delen
+//      staan in de tooltip. Vertrekkers positief = MINDER waard (hun vertrek verhoogde de gemiddelde CLV);
+//   3. totaal: de CLV-verandering van de CLV-tegel (avgClvVsPrevQuarter.abs, avgClvVsYearAgo.abs).
+// Bar 1 + 2 = bar 3 (getoetst in clvChange.test.ts).
+import { gb } from './format'
 import type { View } from './quarters'
 
-export type ClvBar = { label: string; value: number; total?: boolean }
+export type ClvBar = { label: string; value: number; total?: boolean; tip?: string }
 export type ClvBlock = { key: 'qoq' | 'yoy'; title: string; vs: string; bars: ClvBar[] }
 
 export const existingLabel = (v: number) => `Existing customers became ${v >= 0 ? 'more' : 'less'} valuable`
-export const newcomersLabel = (v: number) => `New and returning customers were worth ${v >= 0 ? 'more' : 'less'} than existing ones`
-export const leaversLabel = (v: number) => `Customers who left were worth ${v >= 0 ? 'less' : 'more'} than those who stayed`
+
+/**
+ * Tooltip bij "Customer mix", met de twee delen uit de data. Nieuwkomers > 0: meer waard dan de bestaande
+ * klanten. Vertrekkers > 0: minder waard dan de blijvers, wat het gemiddelde verhoogde. "too" alleen als
+ * beide groepen dezelfde kant op afweken (allebei less of allebei more).
+ */
+export function mixTip(newcomers: number, leavers: number): string {
+  const inWord = newcomers >= 0 ? 'more' : 'less'
+  const outWord = leavers >= 0 ? 'less' : 'more'
+  const too = inWord === outWord ? ' too' : ''
+  return (
+    'The effect of who joined and who left. ' +
+    `New and returning customers were worth ${inWord} than existing ones (${gb.signedClv(newcomers)}); ` +
+    `customers who left were worth ${outWord}${too}, which ${leavers >= 0 ? 'raised' : 'lowered'} the average (${gb.signedClv(leavers)}).`
+  )
+}
 
 function block(
   key: ClvBlock['key'],
@@ -32,8 +47,8 @@ function block(
     vs,
     bars: [
       { label: existingLabel(existing), value: existing },
-      { label: newcomersLabel(newcomers), value: newcomers },
-      { label: leaversLabel(leavers), value: leavers },
+      // Customer mix = nieuwkomers + vertrekkers (samen het mix effect); de delen staan in de tooltip.
+      { label: 'Customer mix', value: newcomers + leavers, tip: mixTip(newcomers, leavers) },
       { label: 'Change in average CLV', value: total, total: true },
     ],
   }

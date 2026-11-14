@@ -1,58 +1,62 @@
-// Kaart "What changed average CLV": per blok bar 1 + 2 + 3 = bar 4, en bar 4 = de CLV-verandering
-// van de CLV-tegel, binnen 1 cent, voor alle kiesbare kwartalen. De teksten volgen het teken.
+// Kaart "What changed average CLV": per blok drie bars (Existing customers, Customer mix, totaal).
+// Bar 1 + bar 2 = bar 3 = de CLV-verandering van de CLV-tegel, binnen 1 cent, voor alle kiesbare
+// kwartalen. De tooltip bij Customer mix noemt de twee delen met woorden die bij het teken passen.
 import { describe, expect, it } from 'vitest'
-import { clvChangeBlocks, existingLabel, leaversLabel, newcomersLabel } from './clvChange'
+import { clvChangeBlocks, existingLabel, mixTip } from './clvChange'
 import { quarters, selectable, viewFor } from './quarters'
 
 describe('What changed average CLV', () => {
-  it('twee blokken (QoQ, YoY) met vier bars voor elk kiesbaar kwartaal', () => {
+  it('twee blokken (QoQ, YoY) met drie bars in vaste volgorde', () => {
     for (const i of selectable) {
       const blocks = clvChangeBlocks(viewFor(i))
       expect(blocks.map((b) => b.key), quarters[i].label).toEqual(['qoq', 'yoy'])
-      for (const b of blocks) expect(b.bars).toHaveLength(4)
+      for (const b of blocks) {
+        expect(b.bars.map((x) => x.label)).toEqual([existingLabel(b.bars[0].value), 'Customer mix', 'Change in average CLV'])
+        expect(b.bars[2].total).toBe(true)
+      }
     }
   })
 
-  it('bar 1 + 2 + 3 = bar 4 = CLV-verandering van de CLV-tegel (binnen 1 cent)', () => {
+  it('bar 1 + bar 2 = bar 3 = CLV-verandering van de CLV-tegel (binnen 1 cent), QoQ en YoY', () => {
     for (const i of selectable) {
       const q = quarters[i]
       const [qoq, yoy] = clvChangeBlocks(viewFor(i))
       for (const [b, tile] of [[qoq, q.avgClvVsPrevQuarter!.abs], [yoy, q.avgClvVsYearAgo!.abs]] as const) {
-        const [existing, newcomers, leavers, total] = b.bars
-        expect(Math.abs(existing.value + newcomers.value + leavers.value - total.value), `${q.label} ${b.key}`).toBeLessThanOrEqual(0.01)
+        const [existing, mix, total] = b.bars
+        expect(Math.abs(existing.value + mix.value - total.value), `${q.label} ${b.key}`).toBeLessThanOrEqual(0.01)
         expect(Math.abs(total.value - tile), `${q.label} ${b.key}`).toBeLessThanOrEqual(0.01)
       }
     }
   })
 
-  it('teksten volgen het teken; vertrekkers positief = minder waard', () => {
-    expect(leaversLabel(6.5)).toBe('Customers who left were worth less than those who stayed')
-    expect(leaversLabel(-0.4)).toBe('Customers who left were worth more than those who stayed')
-    expect(newcomersLabel(-5.7)).toBe('New and returning customers were worth less than existing ones')
-    expect(newcomersLabel(1.2)).toBe('New and returning customers were worth more than existing ones')
+  it('Customer mix: QoQ = customerMix, YoY = nieuwkomers + vertrekkers foto tegen foto', () => {
     for (const i of selectable) {
-      for (const b of clvChangeBlocks(viewFor(i))) {
-        const [existing, newcomers, leavers, total] = b.bars
-        expect(existing.label).toBe(existingLabel(existing.value))
-        expect(newcomers.label).toBe(newcomersLabel(newcomers.value))
-        expect(leavers.label).toBe(leavers.value >= 0
-          ? 'Customers who left were worth less than those who stayed'
-          : 'Customers who left were worth more than those who stayed')
-        expect(total.label).toBe('Change in average CLV')
-        expect(total.total).toBe(true)
-      }
+      const q = quarters[i]
+      const [qoq, yoy] = clvChangeBlocks(viewFor(i))
+      expect(Math.abs(qoq.bars[1].value - q.customerMix), q.label).toBeLessThan(1e-9)
+      expect(yoy.bars[0].value, q.label).toBe(q.existingCustomerValueYoY)
+      expect(yoy.bars[1].value, q.label).toBe(q.customerMixNewcomersYoY! + q.customerMixLeaversYoY!)
     }
   })
 
-  it('YoY foto tegen foto (migratie 23): de bars zijn de YoY-velden, niet de som van vier kwartalen', () => {
+  it('tooltip: woorden passen bij het teken', () => {
+    expect(mixTip(-5.71, 6.51)).toBe(
+      'The effect of who joined and who left. New and returning customers were worth less than existing ones (−€5.71); customers who left were worth less too, which raised the average (+€6.51).',
+    )
+    expect(mixTip(1.2, -0.4)).toBe(
+      'The effect of who joined and who left. New and returning customers were worth more than existing ones (+€1.20); customers who left were worth more too, which lowered the average (−€0.40).',
+    )
+    expect(mixTip(-2, -1)).toBe(
+      'The effect of who joined and who left. New and returning customers were worth less than existing ones (−€2.00); customers who left were worth more, which lowered the average (−€1.00).',
+    )
     for (const i of selectable) {
       const q = quarters[i]
-      const [, yoy] = clvChangeBlocks(viewFor(i))
-      expect(yoy.bars.slice(0, 3).map((b) => b.value), q.label).toEqual([
-        q.existingCustomerValueYoY,
-        q.customerMixNewcomersYoY,
-        q.customerMixLeaversYoY,
-      ])
+      for (const [inV, outV] of [[q.customerMixNewcomers, q.customerMixLeavers], [q.customerMixNewcomersYoY!, q.customerMixLeaversYoY!]]) {
+        const t = mixTip(inV, outV)
+        expect(t).toContain(`New and returning customers were worth ${inV >= 0 ? 'more' : 'less'} than existing ones (${inV >= 0 ? '+' : '−'}€`)
+        expect(t).toContain(`customers who left were worth ${outV >= 0 ? 'less' : 'more'}`)
+        expect(t).toContain(`which ${outV >= 0 ? 'raised' : 'lowered'} the average (${outV >= 0 ? '+' : '−'}€`)
+      }
     }
   })
 

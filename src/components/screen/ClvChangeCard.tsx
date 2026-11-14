@@ -1,5 +1,5 @@
-// Kaart "What changed average CLV" onder de CLV-tegel: twee blokken (QoQ, YoY) met elk vier
-// horizontale bars (bestaande klanten, nieuwkomers, vertrekkers, totaal). Elk blok een eigen schaal met
+// Kaart "What changed average CLV" onder de CLV-tegel: twee blokken (QoQ, YoY) met elk drie
+// horizontale bars (bestaande klanten, customer mix met tooltip, totaal). Elk blok een eigen schaal met
 // nul in beeld; negatieve bars naar links. Kleuren voor positief en negatief zoals in de waterfall;
 // het totaal neutraal. Geen tijdlijn en geen gedeelde hover. Alle bedragen komen uit de data.
 import { clvChangeBlocks, type ClvBlock } from '../../lib/clvChange'
@@ -26,7 +26,15 @@ function Block({ block }: { block: ClvBlock }) {
         const color = b.total ? C_TOTAL : b.value >= 0 ? C_UP : C_DN
         return (
           <div key={b.label} className={`cc-row${b.total ? ' cc-total' : ''}`}>
-            <span className="cc-label">{b.label}</span>
+            <span className="cc-label">
+              {b.label}
+              {b.tip ? (
+                <span className="tip">
+                  <button type="button" className="ib" aria-label={`Explanation of ${b.label}`}>i</button>
+                  <span className="tt" role="tooltip">{b.tip}</span>
+                </span>
+              ) : null}
+            </span>
             <div className="cc-line">
               <div className="cc-track">
                 <div className="cc-zero" style={{ left: `${zero}%` }} />
