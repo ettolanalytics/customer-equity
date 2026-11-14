@@ -17,16 +17,17 @@ export function MethodSection({ view }: { view: View }) {
   const returning = c.model.some((m) => m.segment === 0)
   // Hoe het sBG-model is geschat, uit de parameters in de data (per startabonnement en/of terugkeerders apart).
   const fitted = perPlan
-    ? `fitted per starting plan${returning ? ' and separately for returning customers' : ''}, on all subscriptions up to the quarter`
-    : `fitted on all customers together${returning ? ' and separately for returning customers' : ''}, on all subscriptions up to the quarter`
+    ? `fitted per starting plan${returning ? ', separately for returning customers' : ''}, on all subscriptions up to the quarter`
+    : `fitted on all customers together${returning ? ', separately for returning customers' : ''}, on all subscriptions up to the quarter`
 
   const intro = `A customer's CLV is the margin we expect them to bring in over the next ${years} years, counted in today's euros. It combines three things:`
   const model: [string, string][] = [
     [
       'How long the customer stays.',
-      'Every customer has their own chance of cancelling each month, and these chances differ between customers. ' +
+      'We predict how long each customer will stay using the shifted-beta-geometric model. ' +
+        'It assumes every customer has their own chance of cancelling each month, and that these chances differ between customers. ' +
         'Customers who cancel easily tend to leave early, so the longer a customer has stayed, the more likely they are to stay. ' +
-        `This is the shifted-beta-geometric model, ${fitted}. ` +
+        `The model is ${fitted}. ` +
         `A customer whose subscription expired less than ${a.graceDays} days ago counts at ${gb.pct(c.lateRenewalFactor)} of their CLV, because that is the share that still renews.`,
     ],
     [
