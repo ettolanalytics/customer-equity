@@ -29,13 +29,15 @@ describe('What changed average CLV', () => {
     }
   })
 
-  it('Customer mix: QoQ = customerMix, YoY = nieuwkomers + vertrekkers foto tegen foto', () => {
+  it('Customer mix uit de data: QoQ = customerMix, YoY = customerMixYoY (foto tegen foto)', () => {
     for (const i of selectable) {
       const q = quarters[i]
       const [qoq, yoy] = clvChangeBlocks(viewFor(i))
       expect(Math.abs(qoq.bars[1].value - q.customerMix), q.label).toBeLessThan(1e-9)
       expect(yoy.bars[0].value, q.label).toBe(q.existingCustomerValueYoY)
-      expect(yoy.bars[1].value, q.label).toBe(q.customerMixNewcomersYoY! + q.customerMixLeaversYoY!)
+      expect(yoy.bars[1].value, q.label).toBe(q.customerMixYoY)
+      // het veld uit de data = som van de twee delen (migratie 24)
+      expect(Math.abs(q.customerMixYoY! - (q.customerMixNewcomersYoY! + q.customerMixLeaversYoY!)), q.label).toBeLessThanOrEqual(0.01)
     }
   })
 
@@ -70,7 +72,8 @@ describe('What changed average CLV', () => {
 
   it('zonder kwartaal een jaar eerder geen YoY-delen', () => {
     quarters.slice(0, 4).forEach((q) => {
-      expect([q.existingCustomerValueYoY, q.customerMixNewcomersYoY, q.customerMixLeaversYoY], q.label).toEqual([null, null, null])
+      expect([q.existingCustomerValueYoY, q.customerMixNewcomersYoY, q.customerMixLeaversYoY, q.customerMixYoY], q.label)
+        .toEqual([null, null, null, null])
     })
   })
 

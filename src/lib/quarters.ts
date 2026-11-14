@@ -109,6 +109,8 @@ export type Quarter = {
   existingCustomerValueYoY: number | null
   customerMixNewcomersYoY: number | null
   customerMixLeaversYoY: number | null
+  /** customerMixNewcomersYoY + customerMixLeaversYoY (migratie 24), de YoY-bar "Change in customer mix". */
+  customerMixYoY: number | null
   /** Zuiver churnpercentage (gechurnd uit de beginstand ÷ beginstand); niet op het scherm. */
   churnRateVsPrevQuarter: number | null
   churnRateVsYearAgo: number | null
