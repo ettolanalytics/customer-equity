@@ -32,7 +32,7 @@ export function MethodSection({ view }: { view: View }) {
     [
       'What each invoice earns.',
       'Price minus the cost of each delivery, excluding VAT, averaged over the last 12 months per plan, including expected up- and downgrades. ' +
-        'The cost of acquiring the customer is not included.',
+        'The cost of acquiring the customer is (currently) not included.',
     ],
     [
       'When it comes in.',
