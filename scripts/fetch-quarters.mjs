@@ -27,7 +27,8 @@ const QUARTER_KEYS_V2 = [
   'churnVsPrevQuarter', 'newVsYearAgo', 'reacquiredVsYearAgo', 'churnVsYearAgo', 'newLast4Quarters', 'reacquiredLast4Quarters', 'churnLast4Quarters',
   'newLast4VsPrior4', 'reacquiredLast4VsPrior4', 'churnLast4VsPrior4', 'customerMixLast4Quarters',
   'existingCustomerValueLast4Quarters', 'customerMixNewcomers', 'customerMixLeavers',
-  'customerMixNewcomersLast4Quarters', 'customerMixLeaversLast4Quarters', 'churnRateVsPrevQuarter', 'churnRateVsYearAgo',
+  'customerMixNewcomersLast4Quarters', 'customerMixLeaversLast4Quarters', 'existingCustomerValueYoY',
+  'customerMixNewcomersYoY', 'customerMixLeaversYoY', 'churnRateVsPrevQuarter', 'churnRateVsYearAgo',
   'yearSummary', 'waterfall', 'yearWaterfall',
 ].sort()
 

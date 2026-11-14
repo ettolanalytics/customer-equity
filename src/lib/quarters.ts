@@ -104,6 +104,11 @@ export type Quarter = {
   customerMixLeavers: number
   customerMixNewcomersLast4Quarters: number | null
   customerMixLeaversLast4Quarters: number | null
+  /** CLV-kaart YoY foto tegen foto (migratie 23): blijvers, nieuwkomers, vertrekkers tussen het eind van
+   *  hetzelfde kwartaal vorig jaar en nu; samen = avgClvVsYearAgo.abs. */
+  existingCustomerValueYoY: number | null
+  customerMixNewcomersYoY: number | null
+  customerMixLeaversYoY: number | null
   /** Zuiver churnpercentage (gechurnd uit de beginstand ÷ beginstand); niet op het scherm. */
   churnRateVsPrevQuarter: number | null
   churnRateVsYearAgo: number | null

@@ -44,6 +44,32 @@ describe('What changed average CLV', () => {
     }
   })
 
+  it('YoY foto tegen foto (migratie 23): de bars zijn de YoY-velden, niet de som van vier kwartalen', () => {
+    for (const i of selectable) {
+      const q = quarters[i]
+      const [, yoy] = clvChangeBlocks(viewFor(i))
+      expect(yoy.bars.slice(0, 3).map((b) => b.value), q.label).toEqual([
+        q.existingCustomerValueYoY,
+        q.customerMixNewcomersYoY,
+        q.customerMixLeaversYoY,
+      ])
+    }
+  })
+
+  it('YoY Existing customers × actieve klanten nu = Existing customers in de jaarwaterfall (≤ €1)', () => {
+    for (const i of selectable) {
+      const q = quarters[i]
+      expect(Math.abs(q.existingCustomerValueYoY! * q.activeEnd - q.yearWaterfall!.parts.existingCustomerValue), q.label)
+        .toBeLessThanOrEqual(1)
+    }
+  })
+
+  it('zonder kwartaal een jaar eerder geen YoY-delen', () => {
+    quarters.slice(0, 4).forEach((q) => {
+      expect([q.existingCustomerValueYoY, q.customerMixNewcomersYoY, q.customerMixLeaversYoY], q.label).toEqual([null, null, null])
+    })
+  })
+
   it('vergelijkingslabels uit de data', () => {
     const i = quarters.findIndex((q) => q.label === 'Q3 2026')
     const [qoq, yoy] = clvChangeBlocks(viewFor(i))

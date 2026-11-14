@@ -1,7 +1,9 @@
 // Kaart "What changed average CLV": per blok (QoQ, YoY) vier bars uit de data, zonder te rekenen.
-//   1. bestaande klanten: existingCustomerValue (QoQ), existingCustomerValueLast4Quarters (YoY);
-//   2. nieuwkomers t.o.v. de blijvers: customerMixNewcomers (QoQ), customerMixNewcomersLast4Quarters (YoY);
-//   3. vertrekkers t.o.v. de blijvers: customerMixLeavers (QoQ), customerMixLeaversLast4Quarters (YoY).
+// Beide blokken foto tegen foto: QoQ begin → eind kwartaal, YoY eind zelfde kwartaal vorig jaar → nu
+// (migratie 23).
+//   1. bestaande klanten: existingCustomerValue (QoQ), existingCustomerValueYoY (YoY);
+//   2. nieuwkomers t.o.v. de blijvers: customerMixNewcomers (QoQ), customerMixNewcomersYoY (YoY);
+//   3. vertrekkers t.o.v. de blijvers: customerMixLeavers (QoQ), customerMixLeaversYoY (YoY).
 //      Positief = vertrekkers waren MINDER waard (hun vertrek verhoogde de gemiddelde CLV);
 //   4. totaal: de CLV-verandering van de CLV-tegel (avgClvVsPrevQuarter.abs, avgClvVsYearAgo.abs).
 // Bar 1 + 2 + 3 = bar 4 (getoetst in clvChange.test.ts); 2 + 3 = het mix effect (migratie 20).
@@ -42,7 +44,7 @@ export function clvChangeBlocks(view: View): ClvBlock[] {
   return [
     block('qoq', view.vsQuarterLabel, `vs ${view.previous?.label ?? ''}`, c.existingCustomerValue,
       c.customerMixNewcomers, c.customerMixLeavers, c.avgClvVsPrevQuarter?.abs ?? null),
-    block('yoy', view.vsYearLabel, `vs ${view.yearAgo?.label ?? ''}`, c.existingCustomerValueLast4Quarters,
-      c.customerMixNewcomersLast4Quarters, c.customerMixLeaversLast4Quarters, c.avgClvVsYearAgo?.abs ?? null),
+    block('yoy', view.vsYearLabel, `vs ${view.yearAgo?.label ?? ''}`, c.existingCustomerValueYoY,
+      c.customerMixNewcomersYoY, c.customerMixLeaversYoY, c.avgClvVsYearAgo?.abs ?? null),
   ].filter((b): b is ClvBlock => b !== null)
 }
