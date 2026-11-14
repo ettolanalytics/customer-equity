@@ -1,3 +1,7 @@
 [build]
   command = "npm run build"
   publish = "dist"
+
+[build.environment]
+  # Node 22: de @supabase-pakketten vragen Node >= 22 (engines).
+  NODE_VERSION = "22"
