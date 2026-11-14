@@ -16,7 +16,7 @@ export type ClvBlock = { key: 'qoq' | 'yoy'; title: string; vs: string; bars: Cl
 export const existingLabel = (v: number) => `Existing customers became ${v >= 0 ? 'more' : 'less'} valuable`
 
 /**
- * Tooltip bij "Customer mix", met de twee delen uit de data. Nieuwkomers > 0: meer waard dan de bestaande
+ * Tooltip bij "Change in customer mix", met de twee delen uit de data. Nieuwkomers > 0: meer waard dan de bestaande
  * klanten. Vertrekkers > 0: minder waard dan de blijvers, wat het gemiddelde verhoogde. "too" alleen als
  * beide groepen dezelfde kant op afweken (allebei less of allebei more).
  */
@@ -48,7 +48,7 @@ function block(
     bars: [
       { label: existingLabel(existing), value: existing },
       // Customer mix = nieuwkomers + vertrekkers (samen het mix effect); de delen staan in de tooltip.
-      { label: 'Customer mix', value: newcomers + leavers, tip: mixTip(newcomers, leavers) },
+      { label: 'Change in customer mix', value: newcomers + leavers, tip: mixTip(newcomers, leavers) },
       { label: 'Change in average CLV', value: total, total: true },
     ],
   }

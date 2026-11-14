@@ -11,7 +11,7 @@ describe('What changed average CLV', () => {
       const blocks = clvChangeBlocks(viewFor(i))
       expect(blocks.map((b) => b.key), quarters[i].label).toEqual(['qoq', 'yoy'])
       for (const b of blocks) {
-        expect(b.bars.map((x) => x.label)).toEqual([existingLabel(b.bars[0].value), 'Customer mix', 'Change in average CLV'])
+        expect(b.bars.map((x) => x.label)).toEqual([existingLabel(b.bars[0].value), 'Change in customer mix', 'Change in average CLV'])
         expect(b.bars[2].total).toBe(true)
       }
     }
