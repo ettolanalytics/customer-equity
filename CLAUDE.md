@@ -473,5 +473,5 @@ convergeert; een gefaalde validatie houdt de publicatie niet tegen.
   revenueEur, churnRate…),
   en de keep-alive (twee weken na een stabiele dagelijkse run).
 - De 60-dagenregel van GitHub voor geplande workflows: nog geen oplossing ingebouwd.
-- Generator verwijderen uit deze repo (scripts/generate_beanrise.py) zodra bevestigd is dat hij
-  in de Beanrise-repo staat.
+- Na de overstap naar quarters_v2 de v1-resten opruimen: generate_beanrise.py, check_beanrise.py,
+  build_quarters.py en de v1-tabellen en -views in ce_private/ce_public.
